@@ -22,6 +22,7 @@ export function SignupForm({
   ...props
 }: React.ComponentProps<"div">) {
   const [isLoading, setIsLoading] = useState(false)
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -44,9 +45,8 @@ export function SignupForm({
     } else {
       const data = await response.json()
       setError(data.message || "Something went wrong")
+      setIsLoading(false)
     }
-
-    setIsLoading(false)
   }
 
   return (
@@ -77,7 +77,7 @@ export function SignupForm({
                 <Input
                   id="email"
                   type="email"
-                  placeholder="m@example.com"
+                  placeholder="dr@example.com"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -95,7 +95,7 @@ export function SignupForm({
               </div>
               {error && <p className="text-red-500 text-sm">{error}</p>}
               <div className="flex flex-col gap-3">
-                <Button type="submit" className="w-full" disabled={isLoading}>
+                <Button type="submit" className="w-full cursor-pointer" disabled={isLoading}>
                   {isLoading && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
@@ -105,13 +105,14 @@ export function SignupForm({
                   type="button"
                   variant="outline"
                   className="w-full cursor-pointer"
-                  disabled={isLoading}
+                  disabled={isLoading || isGoogleLoading}
                   onClick={async () => {
-                    setIsLoading(true)
+                    setIsGoogleLoading(true)
                     await signIn("google", { callbackUrl: "/dashboard" })
+                    setIsGoogleLoading(false)
                   }}
                 >
-                  {isLoading && (
+                  {isGoogleLoading && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
                   Sign up with Google

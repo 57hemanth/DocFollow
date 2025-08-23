@@ -22,6 +22,7 @@ export function LoginForm({
   ...props
 }: React.ComponentProps<"div">) {
   const [isLoading, setIsLoading] = useState(false)
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -42,9 +43,8 @@ export function LoginForm({
       router.push("/dashboard")
     } else {
       setError(result?.error || "Invalid email or password")
+      setIsLoading(false)
     }
-
-    setIsLoading(false)
   }
 
   return (
@@ -90,7 +90,7 @@ export function LoginForm({
               </div>
               {error && <p className="text-red-500 text-sm">{error}</p>}
               <div className="flex flex-col gap-3">
-                <Button type="submit" className="w-full" disabled={isLoading}>
+                <Button type="submit" className="w-full cursor-pointer" disabled={isLoading}>
                   {isLoading && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
@@ -100,13 +100,14 @@ export function LoginForm({
                   type="button"
                   variant="outline"
                   className="w-full cursor-pointer"
-                  disabled={isLoading}
+                  disabled={isLoading || isGoogleLoading}
                   onClick={async () => {
-                    setIsLoading(true)
+                    setIsGoogleLoading(true)
                     await signIn("google", { callbackUrl: "/dashboard" })
+                    setIsGoogleLoading(false)
                   }}
                 >
-                  {isLoading && (
+                  {isGoogleLoading && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
                   Login with Google
