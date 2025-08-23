@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from backend.routes import doctors, patients, remainders, followups, appointments, settings, webhooks, uploads
+from backend.routes import doctors, patients, followups, appointments, settings, webhooks, uploads
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
@@ -23,7 +23,6 @@ app.add_middleware(
 
 app.include_router(doctors.router)
 app.include_router(patients.router)
-app.include_router(remainders.router)
 app.include_router(followups.router)
 app.include_router(appointments.router)
 app.include_router(settings.router)

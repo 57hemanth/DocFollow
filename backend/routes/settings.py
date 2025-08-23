@@ -4,6 +4,7 @@ from backend.database import db
 from backend.services.whatsapp_service import whatsapp_service
 from bson import ObjectId
 from typing import Dict, Any
+from datetime import datetime
 
 router = APIRouter()
 
@@ -117,17 +118,18 @@ async def send_follow_up_reminder(doctor_id: str, reminder_data: Dict[str, Any] 
     )
     
     if result["success"]:
-        # Create or update remainder record
-        remainder_data = {
+        # Create followup record to track the reminder
+        followup_data = {
             "doctor_id": doctor_id,
             "patient_id": reminder_data["patient_id"],
-            "followup_date": reminder_data["follow_up_date"],
-            "message_template": "follow_up_reminder",
-            "status": "sent",
-            "message_sid": result.get("message_sid")
+            "original_data": ["follow_up_reminder"],
+            "ai_draft_message": f"Follow-up reminder sent on {reminder_data['follow_up_date']}",
+            "doctor_decision": "approved",
+            "final_message_sent": True,
+            "created_at": datetime.now()
         }
         
-        db.remainders.insert_one(remainder_data)
+        db.followups.insert_one(followup_data)
         
         return {"status": "success", "message": "Follow-up reminder sent", "result": result}
     else:

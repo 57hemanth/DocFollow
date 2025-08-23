@@ -13,7 +13,7 @@ def create_patient(patient: PatientCreate):
     result = db.patients.insert_one(patient_dict)
     created_patient = db.patients.find_one({"_id": result.inserted_id})
 
-    # Create remainder if followup date and time are provided
+    # Create followup record if followup date and time are provided
     if patient.followup_date and patient.followup_time:
         try:
             # Parse date and time strings
@@ -21,24 +21,29 @@ def create_patient(patient: PatientCreate):
             followup_time = datetime.strptime(patient.followup_time, '%H:%M').time()
             followup_datetime = datetime.combine(followup_date, followup_time)
             
-            remainder = {
+            followup_data = {
                 "doctor_id": patient.doctor_id,
                 "patient_id": str(result.inserted_id),
-                "followup_date": followup_datetime,
-                "message_template": f"Follow-up reminder for {patient.name}",
-                "status": "pending"
+                "original_data": [f"Scheduled follow-up for {patient.name}"],
+                "extracted_data": {"scheduled_datetime": followup_datetime.isoformat()},
+                "ai_draft_message": f"Follow-up scheduled for {patient.name} on {followup_datetime.strftime('%Y-%m-%d at %H:%M')}",
+                "doctor_decision": "scheduled",
+                "final_message_sent": False,
+                "created_at": followup_datetime
             }
-            db.remainders.insert_one(remainder)
+            db.followups.insert_one(followup_data)
+            created_patient["followup_date"] = followup_datetime.isoformat()
         except ValueError as e:
-            # If date/time parsing fails, continue without creating remainder
+            # If date/time parsing fails, continue without creating followup
             print(f"Error parsing followup date/time: {e}")
-
-    # Add followup_date to response if remainder exists
-    remainder = db.remainders.find_one({"patient_id": str(result.inserted_id), "status": "pending"})
-    if remainder:
-        created_patient["followup_date"] = remainder["followup_date"].isoformat()
+            created_patient["followup_date"] = None
     else:
-        created_patient["followup_date"] = None
+        # Check if any existing followup exists
+        followup = db.followups.find_one({"patient_id": str(result.inserted_id)})
+        if followup:
+            created_patient["followup_date"] = followup["created_at"].isoformat()
+        else:
+            created_patient["followup_date"] = None
 
     return created_patient
 
@@ -46,12 +51,12 @@ def create_patient(patient: PatientCreate):
 def get_patients():
     patients = list(db.patients.find())
     
-    # Enrich patients with followup date from remainders
+    # Enrich patients with followup date from followups
     for patient in patients:
         patient_id = str(patient["_id"])
-        remainder = db.remainders.find_one({"patient_id": patient_id, "status": "pending"})
-        if remainder:
-            patient["followup_date"] = remainder["followup_date"].isoformat()
+        followup = db.followups.find_one({"patient_id": patient_id})
+        if followup:
+            patient["followup_date"] = followup["created_at"].isoformat()
         else:
             patient["followup_date"] = None
     
@@ -63,10 +68,10 @@ def get_patient(patient_id: str):
         raise HTTPException(status_code=400, detail="Invalid patient_id")
     patient = db.patients.find_one({"_id": ObjectId(patient_id)})
     if patient:
-        # Enrich patient with followup date from remainders
-        remainder = db.remainders.find_one({"patient_id": patient_id, "status": "pending"})
-        if remainder:
-            patient["followup_date"] = remainder["followup_date"].isoformat()
+        # Enrich patient with followup date from followups
+        followup = db.followups.find_one({"patient_id": patient_id})
+        if followup:
+            patient["followup_date"] = followup["created_at"].isoformat()
         else:
             patient["followup_date"] = None
         return patient

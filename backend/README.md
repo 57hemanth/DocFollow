@@ -56,7 +56,7 @@ Once the server is running, you can access the interactive API documentation (Sw
 The main resources available are:
 
 -   `/patients`: CRUD operations for patients.
--   `/remainders`: CRUD operations for follow-up reminders.
+
 -   `/followups`: CRUD operations for patient follow-up records.
 -   `/appointments`: CRUD operations for appointments.
 -   `/settings`: GET and PUT operations for doctor-specific settings.

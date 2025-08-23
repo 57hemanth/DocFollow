@@ -28,10 +28,6 @@ const data = {
       url: "/dashboard/patients",
     },
     {
-      title: "Remainders",
-      url: "/dashboard/remainders",
-    },
-    {
       title: "Follow Ups",
       url: "/dashboard/follow-ups",
     },
