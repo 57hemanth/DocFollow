@@ -90,7 +90,7 @@ export default function Page() {
                   <TableCell>
                     {patient.followup_date ? (
                       <>
-                        {new Date(patient.followup_date).toLocaleDateString()}
+                        {new Date(patient.followup_date).toLocaleDateString('en-GB')}
                         <br />
                         <span className="text-sm text-gray-600 dark:text-gray-400">
                           {formatTo12Hour(patient.followup_date)}
