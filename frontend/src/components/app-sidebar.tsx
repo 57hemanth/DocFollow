@@ -3,6 +3,7 @@ import * as React from "react"
 import { Stethoscope, LogOut } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { signOut } from "next-auth/react"
+import { useSession } from "next-auth/react"
 
 import {
   Sidebar,
@@ -45,20 +46,30 @@ const data = {
   ],
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar() {
+  const { data: session } = useSession()
   const pathname = usePathname()
   return (
-    <Sidebar variant="floating" {...props}>
+    <Sidebar variant="floating">
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <a href="#">
                 <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                  <Stethoscope className="size-4" />
+                  {session?.user?.image ? (
+                    <img
+                      src={session.user.image}
+                      alt={session.user.name ?? "user-image"}
+                      className="size-8 rounded-lg"
+                    />
+                  ) : (
+                    <Stethoscope className="size-4" />
+                  )}
                 </div>
-                <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="font-medium">Dr. Ramesh Babu</span>
+                <div className="flex flex-col">
+                  {/* <span className="text-xs text-slate-500">Welcome back,</span> */}
+                  <span className="font-medium">{session?.user?.name}</span>
                 </div>
               </a>
             </SidebarMenuButton>

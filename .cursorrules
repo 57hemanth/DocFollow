@@ -1,0 +1,103 @@
+# Cursor Project Rules for PingDoc
+
+project_name: PingDoc
+description: >
+  PingDoc is an AI-powered patient follow-up assistant for doctors.
+  Doctors can schedule follow-ups, send automated WhatsApp reminders via Twilio Sandbox,
+  analyze patient-submitted images/reports using AI (Portia SDK),
+  and manage all patients, appointments, and follow-ups from one dashboard.
+
+frontend:
+  framework: Next.js 14 (App Router)
+  styling: Tailwind CSS + ShadCN UI
+  charts: Recharts (for follow-up graphs)
+  animations: Framer Motion
+  pages:
+    - Patients: Manage patient info (CRUD)
+    - Remainders: Schedule automated WhatsApp follow-ups
+    - Followups: View AI-extracted results, doctor decisions, patient history
+    - Appointments: Google Calendar integration (via Portia MCP)
+    - Settings: WhatsApp integration, Calendar connection, profile & security
+
+backend:
+  framework: FastAPI (Python)
+  database: MongoDB (pymongo / motor async driver)
+  sdk: Portia Labs Python SDK
+  integrations:
+    whatsapp: Twilio WhatsApp Sandbox API
+    calendar: Google Calendar MCP via Portia
+  endpoints:
+    - /patients
+    - /remainders
+    - /followups
+    - /appointments
+    - /settings
+    - /webhooks/whatsapp (handle incoming patient messages/images)
+
+database:
+  collections:
+    doctors:
+      - _id
+      - name
+      - email
+      - password_hash
+      - whatsapp_connected (bool)
+      - whatsapp_number
+      - whatsapp_sandbox_id
+      - google_calendar_connected (bool)
+      - settings (object)
+    patients:
+      - _id
+      - doctor_id (ref)
+      - name
+      - disease
+      - phone
+      - address
+      - notes
+    remainders:
+      - _id
+      - doctor_id
+      - patient_id
+      - followup_date
+      - message_template
+      - status (pending/sent/completed)
+    followups:
+      - _id
+      - patient_id
+      - doctor_id
+      - original_data (images/reports/docs)
+      - extracted_data (JSON)
+      - ai_draft_message
+      - doctor_decision (approved/edited/custom)
+      - final_message_sent (bool)
+      - created_at
+    appointments:
+      - _id
+      - doctor_id
+      - patient_id
+      - datetime
+      - status (scheduled/completed/cancelled)
+
+ai_features:
+  - OCR and data extraction from patient images/reports
+  - Generate patient-friendly summaries & draft messages
+  - Doctor-in-the-loop review before sending
+  - Visualize extracted data as charts in dashboard
+  - Appointment suggestion and booking via calendar MCP
+
+whatsapp_integration:
+  provider: Twilio WhatsApp Sandbox
+  flow:
+    - Doctor integrates sandbox number in Settings
+    - System sends reminders via Twilio API
+    - Patient replies with images/docs
+    - FastAPI webhook processes message
+    - AI extracts + drafts response
+    - Doctor approves/edits
+    - System sends final message
+
+dev_notes:
+  - Prioritize clean UI and fast flows (hackathon-ready)
+  - Mock external APIs when needed (e.g. sandbox mode)
+  - Ensure Twilio Sandbox join-code instructions appear in Settings
+  - Optimize for demo: show WhatsApp flow inside dashboard preview too
