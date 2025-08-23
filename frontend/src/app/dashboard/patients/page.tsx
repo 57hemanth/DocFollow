@@ -20,6 +20,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PlusCircle, Loader2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Patient {
   _id: string;
@@ -29,6 +30,7 @@ interface Patient {
   address?: string;
   notes?: string;
   image_url?: string;
+  followup_date?: string;
 }
 
 export default function Page() {
@@ -46,6 +48,10 @@ export default function Page() {
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [followupDate, setFollowupDate] = useState<string>('');
+  const [followupHour, setFollowupHour] = useState<string>('');
+  const [followupMinute, setFollowupMinute] = useState<string>('');
+  const [followupPeriod, setFollowupPeriod] = useState<string>('AM');
 
   useEffect(() => {
     const fetchPatients = async () => {
@@ -74,6 +80,32 @@ export default function Page() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       setSelectedFile(e.target.files[0]);
+    }
+  };
+
+  const convertTo24Hour = (hour: string, minute: string, period: string): string => {
+    if (!hour || !minute) return '';
+    
+    let hour24 = parseInt(hour);
+    if (period === 'PM' && hour24 !== 12) {
+      hour24 += 12;
+    } else if (period === 'AM' && hour24 === 12) {
+      hour24 = 0;
+    }
+    
+    return `${hour24.toString().padStart(2, '0')}:${minute.padStart(2, '0')}`;
+  };
+
+  const formatTo12Hour = (dateTimeString: string): string => {
+    try {
+      const date = new Date(dateTimeString);
+      return date.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit', 
+        hour12: true 
+      });
+    } catch {
+      return 'N/A';
     }
   };
 
@@ -106,12 +138,20 @@ export default function Page() {
     }
 
     try {
+      const followupTime = convertTo24Hour(followupHour, followupMinute, followupPeriod);
+      
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/patients`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ ...newPatient, image_url: imageUrl, doctor_id: '1' }), // Hardcoded doctor_id for now
+        body: JSON.stringify({ 
+          ...newPatient, 
+          image_url: imageUrl, 
+          doctor_id: '1', // Hardcoded doctor_id for now
+          followup_date: followupDate || null,
+          followup_time: followupTime || null,
+        }),
       });
 
       if (!response.ok) {
@@ -122,6 +162,10 @@ export default function Page() {
       setPatients((prev) => [...prev, createdPatient]);
       setNewPatient({ name: '', disease: '', phone: '', address: '', notes: '', image_url: '' });
       setSelectedFile(null);
+      setFollowupDate('');
+      setFollowupHour('');
+      setFollowupMinute('');
+      setFollowupPeriod('AM');
       setIsDialogOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
@@ -188,6 +232,56 @@ export default function Page() {
                 </Label>
                 <Input id="image" type="file" onChange={handleFileChange} className="col-span-3" />
               </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="followup_date" className="text-right text-gray-600 dark:text-gray-400">
+                  Follow-up Date
+                </Label>
+                <Input id="followup_date" type="date" value={followupDate} onChange={(e) => setFollowupDate(e.target.value)} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="followup_time" className="text-right text-gray-600 dark:text-gray-400">
+                  Follow-up Time
+                </Label>
+                <div className="col-span-3 flex gap-2">
+                  <Select value={followupHour} onValueChange={setFollowupHour}>
+                    <SelectTrigger className="w-20">
+                      <SelectValue placeholder="Hour" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((hour) => (
+                        <SelectItem key={hour} value={hour.toString()}>
+                          {hour.toString().padStart(2, '0')}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  <span className="flex items-center text-gray-600 dark:text-gray-400">:</span>
+                  
+                  <Select value={followupMinute} onValueChange={setFollowupMinute}>
+                    <SelectTrigger className="w-20">
+                      <SelectValue placeholder="Min" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => i * 5).map((minute) => (
+                        <SelectItem key={minute} value={minute.toString().padStart(2, '0')}>
+                          {minute.toString().padStart(2, '0')}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  <Select value={followupPeriod} onValueChange={setFollowupPeriod}>
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="AM">AM</SelectItem>
+                      <SelectItem value="PM">PM</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
             <div className="flex justify-end">
               <Button onClick={handleAddPatient} disabled={isUploading}>
@@ -209,15 +303,32 @@ export default function Page() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Image</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Disease</TableHead>
               <TableHead>Phone</TableHead>
+              <TableHead>Follow-up Date</TableHead>
+              <TableHead>Image</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {patients.map((patient) => (
               <TableRow key={patient._id}>
+                <TableCell className="font-medium">{patient.name}</TableCell>
+                <TableCell>{patient.disease}</TableCell>
+                <TableCell>{patient.phone}</TableCell>
+                <TableCell>
+                  {patient.followup_date ? (
+                    <>
+                      {new Date(patient.followup_date).toLocaleDateString()}
+                      <br />
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        {formatTo12Hour(patient.followup_date)}
+                      </span>
+                    </>
+                  ) : (
+                    'N/A'
+                  )}
+                </TableCell>
                 <TableCell>
                   {patient.image_url && (
                     <img
@@ -227,9 +338,6 @@ export default function Page() {
                     />
                   )}
                 </TableCell>
-                <TableCell className="font-medium">{patient.name}</TableCell>
-                <TableCell>{patient.disease}</TableCell>
-                <TableCell>{patient.phone}</TableCell>
               </TableRow>
             ))}
           </TableBody>

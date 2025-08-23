@@ -32,7 +32,8 @@ class PatientBase(BaseModel):
     image_url: Optional[str] = None
 
 class PatientCreate(PatientBase):
-    pass
+    followup_date: Optional[str] = None
+    followup_time: Optional[str] = None
 
 class PatientUpdate(BaseModel):
     name: Optional[str] = None
@@ -44,6 +45,7 @@ class PatientUpdate(BaseModel):
 
 class Patient(PatientBase):
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+    followup_date: Optional[str] = None
 
     class Config:
         json_encoders = {ObjectId: str}
