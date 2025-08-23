@@ -1,11 +1,13 @@
 "use client"
 import * as React from "react"
-import { Stethoscope } from "lucide-react"
+import { Stethoscope, LogOut } from "lucide-react"
 import { usePathname } from "next/navigation"
+import { signOut } from "next-auth/react"
 
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarHeader,
   SidebarMenu,
@@ -78,6 +80,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton className="cursor-pointer" onClick={() => signOut()}>
+              <LogOut className="size-4" />
+              Logout
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
     </Sidebar>
   )
 }

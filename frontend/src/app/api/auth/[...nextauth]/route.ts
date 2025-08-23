@@ -1,12 +1,43 @@
 import NextAuth, { AuthOptions } from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
+import CredentialsProvider from "next-auth/providers/credentials"
 import clientPromise from "@/lib/mongodb"
+import bcrypt from "bcrypt"
 
 export const authOptions: AuthOptions = {
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+    }),
+    CredentialsProvider({
+      name: "Credentials",
+      credentials: {
+        email: { label: "Email", type: "text" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials) {
+          return null
+        }
+        const db = (await clientPromise).db()
+        const user = await db
+          .collection("doctors")
+          .findOne({ email: credentials.email })
+
+        if (user && user.password) {
+          const isValid = await bcrypt.compare(credentials.password, user.password)
+          if (isValid) {
+            return {
+              id: user._id.toHexString(),
+              name: user.name,
+              email: user.email,
+              image: user.image,
+            }
+          }
+        }
+        return null
+      },
     }),
   ],
   pages: {
@@ -46,14 +77,7 @@ export const authOptions: AuthOptions = {
     },
     async jwt({ token, user }: { token: any; user: any }) {
       if (user) {
-        // On initial sign-in, add the user's ID to the token
-        const db = (await clientPromise).db()
-        const dbUser = await db
-          .collection("doctors")
-          .findOne({ email: user.email as string })
-        if (dbUser) {
-          token.id = dbUser._id.toHexString()
-        }
+        token.id = user.id
       }
       return token
     },

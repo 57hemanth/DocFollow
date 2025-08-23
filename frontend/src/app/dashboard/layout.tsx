@@ -1,5 +1,3 @@
-"use client"
-
 import { AppSidebar } from "@/components/app-sidebar"
 import {
   Breadcrumb,
@@ -15,24 +13,20 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { usePathname } from "next/navigation"
-import { useEffect, useState } from "react"
+import { authOptions } from "@/app/api/auth/[...nextauth]/route"
+import { getServerSession } from "next-auth"
+import { redirect } from "next/navigation"
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const pathname = usePathname()
-  const [formattedPageName, setFormattedPageName] = useState("")
+  const session = await getServerSession(authOptions)
 
-  useEffect(() => {
-    const pageName = pathname.split("/").pop() || ""
-    const formatted = pageName
-      .replace(/-/g, " ")
-      .replace(/\b\w/g, (l) => l.toUpperCase())
-    setFormattedPageName(formatted)
-  }, [pathname])
+  if (!session) {
+    redirect("/login")
+  }
 
   return (
     <SidebarProvider
@@ -58,9 +52,6 @@ export default function DashboardLayout({
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
-              <BreadcrumbItem>
-                <BreadcrumbPage>{formattedPageName}</BreadcrumbPage>
-              </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
         </header>
