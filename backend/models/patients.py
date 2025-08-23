@@ -4,7 +4,7 @@ from typing import Optional
 class Patient(BaseModel):
     doctor_id: str
     name: str
-    disease: str
+    diagnosis: str
     phone: str
     address: Optional[str] = None
     notes: Optional[str] = None

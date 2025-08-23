@@ -25,7 +25,7 @@ class PyObjectId(ObjectId):
 class PatientBase(BaseModel):
     doctor_id: str
     name: str
-    disease: str
+    diagnosis: str
     phone: str
     address: Optional[str] = None
     notes: Optional[str] = None
@@ -37,7 +37,7 @@ class PatientCreate(PatientBase):
 
 class PatientUpdate(BaseModel):
     name: Optional[str] = None
-    disease: Optional[str] = None
+    diagnosis: Optional[str] = None
     phone: Optional[str] = None
     address: Optional[str] = None
     notes: Optional[str] = None

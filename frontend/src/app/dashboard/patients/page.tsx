@@ -25,7 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 interface Patient {
   _id: string;
   name: string;
-  disease: string;
+  diagnosis: string;
   phone: string;
   address?: string;
   notes?: string;
@@ -40,7 +40,7 @@ export default function Page() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newPatient, setNewPatient] = useState({
     name: '',
-    disease: '',
+    diagnosis: '',
     phone: '',
     address: '',
     notes: '',
@@ -160,7 +160,7 @@ export default function Page() {
 
       const createdPatient = await response.json();
       setPatients((prev) => [...prev, createdPatient]);
-      setNewPatient({ name: '', disease: '', phone: '', address: '', notes: '', image_url: '' });
+      setNewPatient({ name: '', diagnosis: '', phone: '', address: '', notes: '', image_url: '' });
       setSelectedFile(null);
       setFollowupDate('');
       setFollowupHour('');
@@ -203,10 +203,10 @@ export default function Page() {
                 <Input id="name" value={newPatient.name} onChange={handleInputChange} className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="disease" className="text-right text-gray-600 dark:text-gray-400">
-                  Disease
+                <Label htmlFor="diagnosis" className="text-right text-gray-600 dark:text-gray-400">
+                  Diagnosis
                 </Label>
-                <Input id="disease" value={newPatient.disease} onChange={handleInputChange} className="col-span-3" />
+                <Input id="diagnosis" value={newPatient.diagnosis} onChange={handleInputChange} className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="phone" className="text-right text-gray-600 dark:text-gray-400">
@@ -304,7 +304,7 @@ export default function Page() {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>Disease</TableHead>
+              <TableHead>Diagnosis</TableHead>
               <TableHead>Phone</TableHead>
               <TableHead>Follow-up Date</TableHead>
               <TableHead>Image</TableHead>
@@ -314,7 +314,7 @@ export default function Page() {
             {patients.map((patient) => (
               <TableRow key={patient._id}>
                 <TableCell className="font-medium">{patient.name}</TableCell>
-                <TableCell>{patient.disease}</TableCell>
+                <TableCell>{patient.diagnosis}</TableCell>
                 <TableCell>{patient.phone}</TableCell>
                 <TableCell>
                   {patient.followup_date ? (
