@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Loader2 } from 'lucide-react';
 
 interface Patient {
   _id: string;
@@ -45,6 +45,7 @@ export default function Page() {
     image_url: '',
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     const fetchPatients = async () => {
@@ -83,6 +84,7 @@ export default function Page() {
       const formData = new FormData();
       formData.append('file', selectedFile);
 
+      setIsUploading(true);
       try {
         const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/upload`, {
           method: 'POST',
@@ -98,6 +100,8 @@ export default function Page() {
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
         return;
+      } finally {
+        setIsUploading(false);
       }
     }
 
@@ -186,7 +190,16 @@ export default function Page() {
               </div>
             </div>
             <div className="flex justify-end">
-              <Button onClick={handleAddPatient}>Add Patient</Button>
+              <Button onClick={handleAddPatient} disabled={isUploading}>
+                {isUploading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  'Add Patient'
+                )}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
