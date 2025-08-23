@@ -1,6 +1,6 @@
-# PingDoc Backend
+# Backend
 
-This directory contains the FastAPI backend for the PingDoc application. It provides a RESTful API for managing patients, appointments, follow-ups, and more.
+This directory contains the FastAPI backend for the application. It provides a RESTful API for managing patients, appointments, follow-ups, and more.
 
 ## Getting Started
 
@@ -13,7 +13,7 @@ These instructions will get you a copy of the project up and running on your loc
 
 ### Installation
 
-1.  **Navigate to the project root directory (`PingDoc`)**.
+1.  **Navigate to the project root directory**.
 
 2.  **Create and activate a virtual environment:**
 
@@ -41,7 +41,7 @@ These instructions will get you a copy of the project up and running on your loc
 
 ### Running the Server
 
-To run the backend server for development, ensure you are in the **project's root directory (`PingDoc`)** and that your virtual environment is activated. Then, execute the following command:
+To run the backend server for development, ensure you are in the **project's root directory** and that your virtual environment is activated. Then, execute the following command:
 
 ```bash
 uvicorn backend.server:app --reload

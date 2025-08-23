@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Body, HTTPException, status
 from backend.schemas.settings import Settings
 from backend.database import db
+from backend.services.whatsapp_service import whatsapp_service
 from bson import ObjectId
+from typing import Dict, Any
 
 router = APIRouter()
 
@@ -39,3 +41,94 @@ def update_settings(doctor_id: str, settings: Settings = Body(...)):
         return Settings(**updated_doctor)
 
     raise HTTPException(status_code=404, detail=f"Doctor {doctor_id} not found after update")
+
+@router.get("/settings/whatsapp/sandbox-info")
+async def get_whatsapp_sandbox_info():
+    """Get WhatsApp Sandbox setup instructions"""
+    return whatsapp_service.get_sandbox_instructions()
+
+@router.post("/settings/{doctor_id}/whatsapp/test")
+async def test_whatsapp_connection(doctor_id: str, test_data: Dict[str, str] = Body(...)):
+    """Test WhatsApp connection by sending a test message"""
+    if not ObjectId.is_valid(doctor_id):
+        raise HTTPException(status_code=400, detail="Invalid doctor_id")
+    
+    phone_number = test_data.get("phone_number")
+    if not phone_number:
+        raise HTTPException(status_code=400, detail="phone_number is required")
+    
+    # Get doctor info
+    doctor = db.doctors.find_one({"_id": ObjectId(doctor_id)})
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+    
+    test_message = f"""
+    Hello! This is from Dr. {doctor.get('name', 'Unknown')}. How are you?
+    """.strip()
+    
+    result = await whatsapp_service.send_message(phone_number, test_message)
+    
+    if result["success"]:
+        # Update doctor's WhatsApp connection status
+        update_result = db.doctors.update_one(
+            {"_id": ObjectId(doctor_id)},
+            {"$set": {"whatsapp_connected": True, "whatsapp_number": phone_number}}
+        )
+        
+        if update_result.matched_count > 0:
+            updated_doctor = db.doctors.find_one({"_id": ObjectId(doctor_id)})
+            return {
+                "status": "success", 
+                "message": "Test message sent successfully", 
+                "result": result,
+                "updated_settings": Settings(**updated_doctor).dict()
+            }
+        else:
+            # This case would be rare, as we check for the doctor earlier
+            return {"status": "error", "message": "Failed to find doctor to update connection status"}
+    else:
+        return {"status": "error", "message": f"Failed to send test message: {result['error']}"}
+
+@router.post("/settings/{doctor_id}/whatsapp/send-reminder")
+async def send_follow_up_reminder(doctor_id: str, reminder_data: Dict[str, Any] = Body(...)):
+    """Send a follow-up reminder to a patient"""
+    if not ObjectId.is_valid(doctor_id):
+        raise HTTPException(status_code=400, detail="Invalid doctor_id")
+    
+    required_fields = ["patient_id", "follow_up_date"]
+    for field in required_fields:
+        if field not in reminder_data:
+            raise HTTPException(status_code=400, detail=f"{field} is required")
+    
+    # Get doctor and patient info
+    doctor = db.doctors.find_one({"_id": ObjectId(doctor_id)})
+    patient = db.patients.find_one({"_id": ObjectId(reminder_data["patient_id"])})
+    
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    
+    result = await whatsapp_service.send_follow_up_reminder(
+        patient_phone=patient.get("phone"),
+        patient_name=patient.get("name"),
+        doctor_name=doctor.get("name"),
+        follow_up_date=reminder_data["follow_up_date"]
+    )
+    
+    if result["success"]:
+        # Create or update remainder record
+        remainder_data = {
+            "doctor_id": doctor_id,
+            "patient_id": reminder_data["patient_id"],
+            "followup_date": reminder_data["follow_up_date"],
+            "message_template": "follow_up_reminder",
+            "status": "sent",
+            "message_sid": result.get("message_sid")
+        }
+        
+        db.remainders.insert_one(remainder_data)
+        
+        return {"status": "success", "message": "Follow-up reminder sent", "result": result}
+    else:
+        return {"status": "error", "message": f"Failed to send reminder: {result['error']}"}
