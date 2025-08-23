@@ -1,8 +1,9 @@
 from fastapi import FastAPI
-from backend.routes import patients, remainders, followups, appointments, settings, webhooks
+from backend.routes import doctors, patients, remainders, followups, appointments, settings, webhooks
 
 app = FastAPI()
 
+app.include_router(doctors.router)
 app.include_router(patients.router)
 app.include_router(remainders.router)
 app.include_router(followups.router)
