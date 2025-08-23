@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from backend.routes import doctors, patients, remainders, followups, appointments, settings, webhooks
+from backend.routes import doctors, patients, remainders, followups, appointments, settings, webhooks, uploads
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
@@ -28,6 +28,7 @@ app.include_router(followups.router)
 app.include_router(appointments.router)
 app.include_router(settings.router)
 app.include_router(webhooks.router)
+app.include_router(uploads.router)
 
 @app.get("/health")
 def health_check():

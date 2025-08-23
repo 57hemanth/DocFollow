@@ -29,6 +29,7 @@ class PatientBase(BaseModel):
     phone: str
     address: Optional[str] = None
     notes: Optional[str] = None
+    image_url: Optional[str] = None
 
 class PatientCreate(PatientBase):
     pass
@@ -39,6 +40,7 @@ class PatientUpdate(BaseModel):
     phone: Optional[str] = None
     address: Optional[str] = None
     notes: Optional[str] = None
+    image_url: Optional[str] = None
 
 class Patient(PatientBase):
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")

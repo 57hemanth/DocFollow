@@ -8,3 +8,4 @@ class Patient(BaseModel):
     phone: str
     address: Optional[str] = None
     notes: Optional[str] = None
+    image_url: Optional[str] = None

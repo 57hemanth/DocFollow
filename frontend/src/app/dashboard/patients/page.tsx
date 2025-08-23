@@ -28,6 +28,7 @@ interface Patient {
   phone: string;
   address?: string;
   notes?: string;
+  image_url?: string;
 }
 
 export default function Page() {
@@ -41,7 +42,9 @@ export default function Page() {
     phone: '',
     address: '',
     notes: '',
+    image_url: '',
   });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   useEffect(() => {
     const fetchPatients = async () => {
@@ -67,14 +70,44 @@ export default function Page() {
     setNewPatient((prev) => ({ ...prev, [id]: value }));
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+
   const handleAddPatient = async () => {
+    let imageUrl = '';
+
+    if (selectedFile) {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      try {
+        const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/upload`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error('Failed to upload image');
+        }
+
+        const uploadData = await uploadResponse.json();
+        imageUrl = uploadData.url;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred');
+        return;
+      }
+    }
+
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/patients`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ ...newPatient, doctor_id: '1' }), // Hardcoded doctor_id for now
+        body: JSON.stringify({ ...newPatient, image_url: imageUrl, doctor_id: '1' }), // Hardcoded doctor_id for now
       });
 
       if (!response.ok) {
@@ -83,7 +116,8 @@ export default function Page() {
 
       const createdPatient = await response.json();
       setPatients((prev) => [...prev, createdPatient]);
-      setNewPatient({ name: '', disease: '', phone: '', address: '', notes: '' });
+      setNewPatient({ name: '', disease: '', phone: '', address: '', notes: '', image_url: '' });
+      setSelectedFile(null);
       setIsDialogOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
@@ -144,6 +178,12 @@ export default function Page() {
                 </Label>
                 <Input id="notes" value={newPatient.notes} onChange={handleInputChange} className="col-span-3" />
               </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="image" className="text-right text-gray-600 dark:text-gray-400">
+                  Image
+                </Label>
+                <Input id="image" type="file" onChange={handleFileChange} className="col-span-3" />
+              </div>
             </div>
             <div className="flex justify-end">
               <Button onClick={handleAddPatient}>Add Patient</Button>
@@ -156,6 +196,7 @@ export default function Page() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Image</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Disease</TableHead>
               <TableHead>Phone</TableHead>
@@ -164,6 +205,15 @@ export default function Page() {
           <TableBody>
             {patients.map((patient) => (
               <TableRow key={patient._id}>
+                <TableCell>
+                  {patient.image_url && (
+                    <img
+                      src={patient.image_url}
+                      alt={patient.name}
+                      className="h-10 w-10 rounded-lg object-cover"
+                    />
+                  )}
+                </TableCell>
                 <TableCell className="font-medium">{patient.name}</TableCell>
                 <TableCell>{patient.disease}</TableCell>
                 <TableCell>{patient.phone}</TableCell>
