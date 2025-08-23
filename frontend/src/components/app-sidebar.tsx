@@ -69,7 +69,7 @@ export function AppSidebar() {
                 </div>
                 <div className="flex flex-col">
                   {/* <span className="text-xs text-slate-500">Welcome back,</span> */}
-                  <span className="font-medium">{session?.user?.name}</span>
+                  <span className="font-medium text-sm md:text-base lg:text-base">{session?.user?.name}</span>
                 </div>
               </a>
             </SidebarMenuButton>
@@ -82,7 +82,7 @@ export function AppSidebar() {
             {data.navMain.map((item) => (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton asChild isActive={pathname === item.url}>
-                  <Link href={item.url} className="font-medium">
+                  <Link href={item.url} className="font-light text-sm md:text-base lg:text-base">
                     {item.title}
                   </Link>
                 </SidebarMenuButton>
@@ -94,7 +94,7 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton className="cursor-pointer" onClick={() => signOut()}>
+            <SidebarMenuButton className="cursor-pointer text-sm md:text-base lg:text-base" onClick={() => signOut()}>
               <LogOut className="size-4" />
               Logout
             </SidebarMenuButton>
