@@ -4,9 +4,23 @@ from backend.services.whatsapp_service import whatsapp_service
 from typing import Optional
 import logging
 from datetime import datetime
+from backend.agents import agent_registry
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+async def get_latest_followup_for_patient(patient_id: str):
+    """
+    Find the most recent followup for a patient that is waiting for a response
+    or is currently being reviewed by the doctor.
+    """
+    return db.followups.find_one(
+        {
+            "patient_id": patient_id,
+            "status": {"$in": ["waiting_for_patient", "waiting_for_doctor"]}
+        },
+        sort=[("created_at", -1)]
+    )
 
 @router.post("/webhooks/whatsapp")
 async def whatsapp_webhook(
@@ -19,9 +33,8 @@ async def whatsapp_webhook(
     NumMedia: int = Form(0),
 ):
     """
-    Handle incoming WhatsApp messages from Twilio
-    
-    This webhook receives messages sent by patients to the WhatsApp Sandbox number
+    Handle incoming WhatsApp messages from Twilio, update the follow-up,
+    and trigger the analysis agent.
     """
     try:
         logger.info(f"Received WhatsApp message from {From}: {Body}")
@@ -33,56 +46,51 @@ async def whatsapp_webhook(
         
         if not patient:
             logger.warning(f"No patient found with phone number: {patient_phone}")
-            return {"status": "success", "message": "Patient not found"}
-        
-        # Find the most recent active followup for this patient
-        followup = db.followups.find_one(
-            {"patient_id": str(patient["_id"]), "status": {"$in": ["pending", "sent", "processing"]}},
-            sort=[("created_at", -1)]
-        )
-        
-        if followup:
-            history_entry = {
-                "sender": "patient",
-                "content": Body,
-                "timestamp": datetime.now()
-            }
-            db.followups.update_one(
-                {"_id": followup["_id"]},
-                {"$push": {"history": history_entry}}
-            )
-        else:
-            logger.warning(f"No active followup found for patient {patient['_id']}")
+            return {"status": "success", "message": "Patient not found."}
 
-        from backend.agents import agent_registry
-        message_analysis_agent = agent_registry.get_message_analysis_agent()
-        if not message_analysis_agent:
-            logger.error("Message Analysis Agent not available")
-            raise HTTPException(status_code=500, detail="Message Analysis Agent not available")
+        patient_id = str(patient["_id"])
+        followup = await get_latest_followup_for_patient(patient_id)
 
-        media_items = []
-        if NumMedia > 0:
-            for i in range(NumMedia):
-                media_url = form_data.get(f"MediaUrl{i}")
-                content_type = form_data.get(f"MediaContentType{i}")
-                if media_url:
-                    media_items.append({"url": media_url, "content_type": content_type})
-        
-        result = await message_analysis_agent.analyze_patient_message(
-            patient_id=str(patient["_id"]),
-            doctor_id=patient["doctor_id"],
-            message_content=Body,
-            media_items=media_items
-        )
+        if not followup:
+            logger.warning(f"No active followup found for patient {patient_id}")
+            return {"status": "success", "message": "No active followup."}
 
-        if not result.get("success"):
-            raise HTTPException(status_code=500, detail=result.get("error", "Failed to process message"))
-
-        return {
-            "status": "success", 
-            "message": "Message processed and sent for analysis",
-            "followup_id": result.get("followup_id")
+        # 1. Update Follow-up History and Media
+        new_message = {
+            "sender": "patient",
+            "content": Body,
+            "timestamp": datetime.now()
         }
+        
+        media_urls = [form_data.get(f"MediaUrl{i}") for i in range(NumMedia) if form_data.get(f"MediaUrl{i}")]
+        
+        update_query = {
+            "$push": {"history": new_message},
+            "$set": {
+                "status": "waiting_for_doctor",
+                "updated_at": datetime.now()
+            }
+        }
+        if media_urls:
+            update_query["$addToSet"] = {"original_data": {"$each": media_urls}}
+
+        update_result = db.followups.update_one({"_id": followup["_id"]}, update_query)
+        
+        if update_result.matched_count == 0:
+            logger.error(f"Failed to update followup {followup['_id']} for patient {patient_id}")
+            # Potentially retry or handle error
+            return {"status": "error", "message": "Failed to update followup."}
+
+        # 2. Trigger asynchronous agent processing
+        message_analysis_agent = agent_registry.get_message_analysis_agent()
+        if message_analysis_agent:
+            await message_analysis_agent.process_patient_response(
+                followup_id=str(followup["_id"]),
+                message_content=Body,
+                media_urls=media_urls
+            )
+
+        return {"status": "success", "message": "Patient response received and processing initiated."}
         
     except Exception as e:
         logger.error(f"Error processing WhatsApp webhook: {str(e)}")

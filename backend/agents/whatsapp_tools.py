@@ -5,6 +5,9 @@ Portia tools for WhatsApp messaging through Twilio
 from typing import Annotated, Optional
 from portia import tool
 from backend.services.whatsapp_service import whatsapp_service
+from backend.database import db
+from bson import ObjectId
+from datetime import datetime
 import asyncio
 import logging
 
@@ -17,10 +20,11 @@ def send_whatsapp_message(
     followup_id: Annotated[Optional[str], "The ID of the followup to associate the message with"] = None
 ) -> str:
     """
-    Sends a WhatsApp message to a patient's phone number using Twilio.
+    Sends a WhatsApp message to a patient's phone number using Twilio and logs it in the followup history.
     
     This tool integrates with the existing WhatsApp service to send messages
-    for patient follow-ups, reminders, and other communications.
+    for patient follow-ups, reminders, and other communications. It also updates
+    the followup document with the message history and sets the status.
     
     Args:
         patient_phone: Phone number in E.164 format (e.g., +1234567890)
@@ -31,12 +35,31 @@ def send_whatsapp_message(
         str: Success message with message SID or error description
     """
     try:
-        result = asyncio.run(whatsapp_service.send_message(patient_phone, message, followup_id=followup_id))
+        # Step 1: Send the message via WhatsApp service
+        result = asyncio.run(whatsapp_service.send_message(patient_phone, message))
         
-        if result.get("success"):
-            return f"✅ WhatsApp message sent successfully! Message SID: {result.get('message_sid')}"
-        else:
+        if not result.get("success"):
             return f"❌ Failed to send WhatsApp message: {result.get('error')}"
+
+        # Step 2: If a followup_id is provided, update the document
+        if followup_id:
+            new_message = {
+                "sender": "agent",
+                "content": message,
+                "timestamp": datetime.now()
+            }
+            db.followups.update_one(
+                {"_id": ObjectId(followup_id)},
+                {
+                    "$push": {"history": new_message},
+                    "$set": {
+                        "status": "waiting_for_patient",
+                        "updated_at": datetime.now()
+                    }
+                }
+            )
+        
+        return f"✅ WhatsApp message sent successfully! Message SID: {result.get('message_sid')}"
             
     except Exception as e:
         logger.error(f"Error in send_whatsapp_message tool: {str(e)}")

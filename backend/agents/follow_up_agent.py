@@ -6,7 +6,7 @@ from portia import Portia, Config, PlanBuilder
 from backend.config import PORTIA_LLM_PROVIDER, GOOGLE_API_KEY, OPENAI_API_KEY
 from backend.database import db
 from backend.models.patients import Patient
-from backend.models.followups import Followup
+from backend.schemas.followups import Message
 from .whatsapp_tools import send_whatsapp_message
 import logging
 from datetime import datetime
@@ -49,80 +49,36 @@ class FollowUpAgent:
             logger.error(f"Failed to initialize Follow-up Agent: {str(e)}")
             raise
     
-    async def trigger_follow_up(self, patient_id: str, doctor_id: str) -> Dict[str, Any]:
+    async def trigger_initial_followup(self, patient_id: str, doctor_id: str, followup_id: str):
         """
-        Trigger a follow-up for a patient based on their diagnosis.
+        Generates and sends the initial follow-up message using the AI agent.
+        """
+        patient = self.db.patients.find_one({"_id": ObjectId(patient_id)})
+        doctor = self.db.doctors.find_one({"_id": ObjectId(doctor_id)})
+
+        if not patient or not doctor:
+            raise ValueError("Patient or Doctor not found")
+
+        diagnosis_instructions = {
+            "sugar": "Ask the patient to send their past 3 days' sugar level readings.",
+            "fever": "Ask for the temperature readings of the patient.",
+            "default": "Draft a general follow-up message asking the patient about their well-being."
+        }
+        instruction = diagnosis_instructions.get(patient.get('disease', '').lower(), diagnosis_instructions['default'])
+
+        prompt = f"""
+        You are a medical assistant for Dr. {doctor['name']}.
+        Your task is to send a follow-up message to a patient named {patient['name']} via WhatsApp.
+        The patient's phone number is {patient['phone']}.
+        The followup ID is {followup_id}. You must use this ID when sending the message.
         
-        Args:
-            patient_id: Patient's database ID
-            doctor_id: Doctor's database ID
-            
-        Returns:
-            Dict containing the result of the follow-up attempt
+        Based on the patient's condition ({patient.get('disease', 'N/A')}), here is your instruction: "{instruction}"
+
+        Please compose a friendly, professional, and clear WhatsApp message based on this instruction, and then send it to the patient's phone number using the available tool.
         """
-        try:
-            patient = self.db.patients.find_one({"_id": ObjectId(patient_id)})
-            if not patient:
-                return {"success": False, "error": "Patient not found"}
-
-            doctor = self.db.doctors.find_one({"_id": ObjectId(doctor_id)})
-            if not doctor:
-                return {"success": False, "error": "Doctor not found"}
-
-            # Create a preliminary follow-up record to get an ID
-            preliminary_follow_up = {
-                "patient_id": patient_id,
-                "doctor_id": doctor_id,
-                "status": "pending",
-                "created_at": datetime.now(),
-                "followup_date": datetime.now() # Placeholder, can be updated later
-            }
-            result = self.db.followups.insert_one(preliminary_follow_up)
-            followup_id = str(result.inserted_id)
-
-            # Define diagnosis-based instructions
-            diagnosis_instructions = {
-                "sugar": "Ask the patient to send their past 3 days' sugar level readings.",
-                "fever": "Ask for the temperature readings of the patient.",
-                "default": "Draft a general follow-up message asking the patient about their well-being."
-            }
-
-            instruction = diagnosis_instructions.get(patient.get('diagnosis', '').lower(), diagnosis_instructions['default'])
-
-            prompt = f"""
-            You are a medical assistant for Dr. {doctor['name']}.
-            Your task is to send a follow-up message to a patient named {patient['name']} via WhatsApp.
-            The patient's phone number is {patient['phone']}.
-            The followup ID is {followup_id}. You must use this ID when sending the message.
-            
-            Based on the patient's condition, here is the instruction for the message: "{instruction}"
-
-            Please compose a friendly, professional, and clear WhatsApp message based on this instruction, and then send it to the patient's phone number.
-            """
-
-            plan_run = await asyncio.to_thread(self.portia.run, prompt)
-            
-            # Update the follow-up record with more details
-            self.db.followups.update_one(
-                {"_id": ObjectId(followup_id)},
-                {"$set": {
-                    "ai_draft_message": f"Follow-up for {patient.get('diagnosis', 'N/A')} triggered.",
-                    "doctor_decision": "automated",
-                    "final_message_sent": True, # Assuming the agent sends it
-                    "status": "sent"
-                }}
-            )
-            
-            return {
-                "success": True, 
-                "message": f"Follow-up triggered for {patient['name']}",
-                "plan_run_id": plan_run.id if hasattr(plan_run, 'id') else None,
-                "followup_id": followup_id
-            }
-
-        except Exception as e:
-            logger.error(f"Error triggering follow-up: {str(e)}")
-            return {"success": False, "error": str(e)}
+        
+        # Run Portia agent to execute the plan
+        await asyncio.to_thread(self.portia.run, prompt)
 
 # Global instance will be created by AgentRegistry
 follow_up_agent = None
