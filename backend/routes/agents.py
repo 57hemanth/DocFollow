@@ -1,5 +1,5 @@
 """
-Agent routes for PingDoc - API endpoints for AI agent functionality
+Agent routes for DocFollow - API endpoints for AI agent functionality
 """
 
 from fastapi import APIRouter, HTTPException, Depends

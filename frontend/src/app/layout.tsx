@@ -10,7 +10,7 @@ const dmSans = DM_Sans({
 
 
 export const metadata: Metadata = {
-  title: "PingDoc",
+  title: "DocFollow",
   description: "AI that follows up, so you can focus on healing",
 };
 

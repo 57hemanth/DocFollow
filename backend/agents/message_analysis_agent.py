@@ -1,5 +1,5 @@
 """
-Message Analysis Agent for PingDoc - Analyzes patient responses and medical data
+Message Analysis Agent for DocFollow - Analyzes patient responses and medical data
 """
 
 from portia import Portia, Config, tool, PlanBuilder, LLMProvider

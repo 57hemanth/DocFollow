@@ -1,5 +1,5 @@
 """
-Follow-up Agent for PingDoc - Handles automated patient follow-up workflows
+Follow-up Agent for DocFollow - Handles automated patient follow-up workflows
 """
 
 from portia import Portia, Config, PlanBuilder

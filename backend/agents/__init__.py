@@ -1,5 +1,5 @@
 """
-Portia agents for PingDoc AI-powered patient follow-up system
+Portia agents for DocFollow AI-powered patient follow-up system
 """
 
 from .whatsapp_tools import send_whatsapp_message, send_follow_up_reminder

@@ -1,5 +1,5 @@
 """
-Agent Registry for PingDoc - Central management of all AI agents
+Agent Registry for DocFollow - Central management of all AI agents
 """
 
 from typing import Dict, Any, Optional
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class AgentRegistry:
     """
-    Central registry for managing all AI agents in the PingDoc system.
+    Central registry for managing all AI agents in the DocFollow system.
     Provides a single interface for accessing and coordinating different agents.
     """
     

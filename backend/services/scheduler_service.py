@@ -1,5 +1,5 @@
 """
-Background Scheduler Service for PingDoc - Handles automated follow-up scheduling
+Background Scheduler Service for DocFollow - Handles automated follow-up scheduling
 """
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler

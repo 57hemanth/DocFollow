@@ -14,7 +14,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="PingDoc API", description="AI-powered patient follow-up assistant")
+app = FastAPI(title="DocFollow API", description="AI-powered patient follow-up assistant")
 
 # CORS Middleware
 origins = [
@@ -41,7 +41,7 @@ app.include_router(agents.router)
 @app.on_event("startup")
 async def startup_event():
     """Initialize AI agents and scheduler on server startup"""
-    logger.info("🚀 Starting PingDoc server...")
+    logger.info("🚀 Starting DocFollow server...")
     
     try:
         # Initialize scheduler service first
@@ -59,9 +59,9 @@ async def startup_event():
             logger.warning("⚠️ Some AI agents failed to initialize")
             
         if scheduler_success and agent_success:
-            logger.info("🎉 PingDoc server started successfully with all services")
+            logger.info("🎉 DocFollow server started successfully with all services")
         else:
-            logger.warning("⚠️ PingDoc server started with some service failures")
+            logger.warning("⚠️ DocFollow server started with some service failures")
             
     except Exception as e:
         logger.error(f"❌ Failed to initialize services: {str(e)}")
@@ -69,7 +69,7 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """Gracefully shutdown services"""
-    logger.info("🛑 Shutting down PingDoc server...")
+    logger.info("🛑 Shutting down DocFollow server...")
     
     try:
         # Shutdown scheduler service
