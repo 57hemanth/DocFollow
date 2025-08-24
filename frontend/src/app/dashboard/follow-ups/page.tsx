@@ -13,6 +13,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RefreshCw, Clock, CheckCircle, Calendar } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogClose
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useSession } from 'next-auth/react';
 
 interface FollowUp {
   _id: string;
@@ -36,17 +47,24 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterStatus>('upcoming');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedFollowUp, setSelectedFollowUp] = useState<FollowUp | null>(null);
+  const [isRescheduleDialogOpen, setIsRescheduleDialogOpen] = useState(false);
+  const [newFollowupDate, setNewFollowupDate] = useState<string>('');
+  const [newFollowupHour, setNewFollowupHour] = useState<string>('');
+  const [newFollowupMinute, setNewFollowupMinute] = useState<string>('');
+  const [newFollowupPeriod, setNewFollowupPeriod] = useState<string>('AM');
+  const { data: session } = useSession();
 
   const fetchFollowUps = async () => {
+    if (!session?.user?.id) return;
     try {
       setIsRefreshing(true);
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/followups/with-patients`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/followups?doctor_id=${session.user.id}`);
       if (!response.ok) {
         throw new Error('Failed to fetch follow-ups');
       }
       const data = await response.json();
       
-      // Categorize follow-ups based on date and status
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       
@@ -56,7 +74,7 @@ export default function Page() {
         
         let status: 'upcoming' | 'current' | 'completed' | 'overdue';
         
-        if (followup.final_message_sent && followup.response_received) {
+        if (followup.status === 'completed') {
           status = 'completed';
         } else if (followupDay < today) {
           status = 'overdue';
@@ -68,7 +86,9 @@ export default function Page() {
         
         return {
           ...followup,
-          status
+          status,
+          message_sent: followup.status === 'sent' || followup.status === 'completed',
+          response_received: !!followup.original_data,
         };
       });
       
@@ -83,7 +103,7 @@ export default function Page() {
 
   useEffect(() => {
     fetchFollowUps();
-  }, []);
+  }, [session]);
 
   useEffect(() => {
     if (filter === 'all') {
@@ -92,6 +112,59 @@ export default function Page() {
       setFilteredFollowUps(followUps.filter(followup => followup.status === filter));
     }
   }, [followUps, filter]);
+
+  const convertTo24Hour = (hour: string, minute: string, period: string): string => {
+    if (!hour || !minute) return '';
+    
+    let hour24 = parseInt(hour);
+    if (period === 'PM' && hour24 !== 12) {
+      hour24 += 12;
+    } else if (period === 'AM' && hour24 === 12) {
+      hour24 = 0;
+    }
+    
+    return `${hour24.toString().padStart(2, '0')}:${minute.padStart(2, '0')}`;
+  };
+
+  const handleReschedule = async () => {
+    if (!selectedFollowUp || !newFollowupDate) return;
+    const time = convertTo24Hour(newFollowupHour, newFollowupMinute, newFollowupPeriod);
+    if (!time) {
+      setError("Please select a valid time.");
+      return;
+    }
+    if (!session?.user?.id) {
+      setError("Doctor ID not found. Please log in again.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/followups/${selectedFollowUp._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          followup_date: `${newFollowupDate}T${time}:00`,
+          doctor_id: session.user.id,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to reschedule');
+      }
+
+      fetchFollowUps();
+      setIsRescheduleDialogOpen(false);
+      setNewFollowupDate('');
+      setNewFollowupHour('');
+      setNewFollowupMinute('');
+      setNewFollowupPeriod('AM');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+    }
+  };
 
   const formatTo12Hour = (dateTimeString: string): string => {
     try {
@@ -185,6 +258,7 @@ export default function Page() {
               <TableHead>Follow-up Date</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Progress</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -222,11 +296,23 @@ export default function Page() {
                       </div>
                     </div>
                   </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedFollowUp(followup);
+                        setIsRescheduleDialogOpen(true);
+                      }}
+                    >
+                      Reschedule
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-gray-500 dark:text-gray-400">
+                <TableCell colSpan={7} className="text-center text-gray-500 dark:text-gray-400">
                   {filter === 'all' ? 'No follow-ups found.' : `No ${filter} follow-ups.`}
                 </TableCell>
               </TableRow>
@@ -234,6 +320,77 @@ export default function Page() {
           </TableBody>
         </Table>
       </div>
+      <Dialog open={isRescheduleDialogOpen} onOpenChange={setIsRescheduleDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reschedule Follow-up for {selectedFollowUp?.patient_name}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="newFollowupDate" className="text-right">
+                New Date
+              </Label>
+              <Input
+                id="newFollowupDate"
+                type="date"
+                value={newFollowupDate}
+                onChange={(e) => setNewFollowupDate(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="newFollowupTime" className="text-right">
+                New Time
+              </Label>
+              <div className="col-span-3 flex gap-2">
+                  <Select value={newFollowupHour} onValueChange={setNewFollowupHour}>
+                    <SelectTrigger className="w-20">
+                      <SelectValue placeholder="Hour" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((hour) => (
+                        <SelectItem key={hour} value={hour.toString()}>
+                          {hour.toString().padStart(2, '0')}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  <span className="flex items-center text-gray-600 dark:text-gray-400">:</span>
+                  
+                  <Select value={newFollowupMinute} onValueChange={setNewFollowupMinute}>
+                    <SelectTrigger className="w-20">
+                      <SelectValue placeholder="Min" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 60 }, (_, i) => i).map((minute) => (
+                        <SelectItem key={minute} value={minute.toString().padStart(2, '0')}>
+                          {minute.toString().padStart(2, '0')}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  <Select value={newFollowupPeriod} onValueChange={setNewFollowupPeriod}>
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="AM">AM</SelectItem>
+                      <SelectItem value="PM">PM</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button onClick={handleReschedule}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

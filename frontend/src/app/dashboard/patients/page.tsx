@@ -102,14 +102,14 @@ export default function Page() {
     }
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/patients/${selectedPatient._id}/reschedule`, {
-        method: 'POST',
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/followups/${selectedPatient._id}`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          new_date: newFollowupDate,
-          new_time: time,
+          followup_date: `${newFollowupDate}T${time}:00`,
+          doctor_id: session?.user.id,
         }),
       });
 
@@ -204,7 +204,7 @@ export default function Page() {
         return;
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/patients`, {
+      const patientResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/patients`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -213,17 +213,39 @@ export default function Page() {
           ...newPatient, 
           image_url: imageUrl, 
           doctor_id: doctorId,
-          followup_date: followupDate || null,
-          followup_time: followupTime || null,
         }),
       });
 
-      if (!response.ok) {
+      if (!patientResponse.ok) {
         throw new Error('Failed to add patient');
       }
+      const createdPatient = await patientResponse.json();
 
-      const createdPatient = await response.json();
-      setPatients((prev) => [...prev, createdPatient]);
+      if(followupDate && followupTime) {
+        const followupResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/followups`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            patient_id: createdPatient._id,
+            doctor_id: doctorId,
+            followup_date: `${followupDate}T${followupTime}:00`,
+          }),
+        });
+
+        if (!followupResponse.ok) {
+          const errorData = await followupResponse.json();
+          throw new Error(errorData.detail || 'Failed to add followup');
+        }
+      }
+
+      const finalPatient = {
+        ...createdPatient,
+        followup_date: followupDate && followupTime ? `${followupDate}T${followupTime}:00` : undefined,
+      };
+
+      setPatients((prev) => [...prev, finalPatient]);
       setNewPatient({ name: '', diagnosis: '', phone: '', address: '', notes: '', image_url: '' });
       setSelectedFile(null);
       setFollowupDate('');

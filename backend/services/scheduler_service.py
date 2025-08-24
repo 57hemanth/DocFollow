@@ -16,23 +16,23 @@ from backend.database import db
 logger = logging.getLogger(__name__)
 
 def _cleanup_old_jobs():
-    """Clean up old completed/failed remainder records"""
+    """Clean up old completed/failed followup records"""
     try:
-        # Remove remainders older than 30 days that are completed or failed
+        # Remove followups older than 30 days that are completed or failed
         cutoff_date = datetime.now() - timedelta(days=30)
         
-        result = db.remainders.delete_many({
+        result = db.followups.delete_many({
             "created_at": {"$lt": cutoff_date},
             "status": {"$in": ["sent", "failed", "completed"]}
         })
         
-        logger.info(f"🧹 Cleaned up {result.deleted_count} old remainder records")
+        logger.info(f"🧹 Cleaned up {result.deleted_count} old followup records")
         
     except Exception as e:
         logger.error(f"❌ Error in cleanup job: {str(e)}")
 
 def _send_follow_up_reminder(
-    remainder_id: str,
+    followup_id: str,
     patient_id: str,
     doctor_id: str,
     followup_datetime_str: str
@@ -41,17 +41,17 @@ def _send_follow_up_reminder(
     Internal method to send follow-up reminder (called by scheduler)
     
     Args:
-        remainder_id: Database ID of the remainder record
+        followup_id: Database ID of the followup record
         patient_id: Patient's database ID
         doctor_id: Doctor's database ID
         followup_datetime_str: Follow-up datetime as ISO string
     """
     try:
-        logger.info(f"🕒 Executing scheduled follow-up for remainder {remainder_id}")
+        logger.info(f"🕒 Executing scheduled follow-up for followup {followup_id}")
         
-        # Update remainder status to sending
-        db.remainders.update_one(
-            {"_id": remainder_id},
+        # Update followup status to sending
+        db.followups.update_one(
+            {"_id": followup_id},
             {"$set": {
                 "status": "processing",
                 "last_attempt": datetime.now(),
@@ -69,33 +69,33 @@ def _send_follow_up_reminder(
         result = follow_up_agent.trigger_follow_up(patient_id, doctor_id)
         
         if result.get("success"):
-            # Update remainder status to sent
-            db.remainders.update_one(
-                {"_id": remainder_id},
+            # Update followup status to sent
+            db.followups.update_one(
+                {"_id": followup_id},
                 {"$set": {"status": "completed"}}
             )
-            logger.info(f"✅ Follow-up triggered successfully for remainder {remainder_id}")
+            logger.info(f"✅ Follow-up triggered successfully for followup {followup_id}")
         else:
-            # Update remainder status to failed
-            db.remainders.update_one(
-                {"_id": remainder_id},
+            # Update followup status to failed
+            db.followups.update_one(
+                {"_id": followup_id},
                 {"$set": {
                     "status": "failed",
                     "error_message": result.get("error", "Unknown error")
                 }}
             )
-            logger.error(f"❌ Failed to trigger follow-up for remainder {remainder_id}: {result.get('error')}")
+            logger.error(f"❌ Failed to trigger follow-up for followup {followup_id}: {result.get('error')}")
         
     except Exception as e:
-        # Update remainder status to failed
-        db.remainders.update_one(
-            {"_id": remainder_id},
+        # Update followup status to failed
+        db.followups.update_one(
+            {"_id": followup_id},
             {"$set": {
                 "status": "failed",
                 "error_message": str(e)
             }}
         )
-        logger.error(f"❌ Exception in _send_follow_up_reminder for remainder {remainder_id}: {str(e)}")
+        logger.error(f"❌ Exception in _send_follow_up_reminder for followup {followup_id}: {str(e)}")
 
 class SchedulerService:
     """
@@ -174,17 +174,15 @@ class SchedulerService:
         patient_id: str,
         doctor_id: str,
         followup_datetime: datetime,
-        advance_hours: int = 24
     ) -> Optional[str]:
         """
         Schedule a follow-up reminder to be sent before the appointment
         
         Args:
-            remainder_id: Database ID of the remainder record
+            remainder_id: Database ID of the followup record
             patient_id: Patient's database ID
             doctor_id: Doctor's database ID
             followup_datetime: The actual follow-up appointment time
-            advance_hours: Hours before appointment to send reminder (default: 24)
             
         Returns:
             str: Job ID if scheduled successfully, None if failed
@@ -194,16 +192,16 @@ class SchedulerService:
             return None
         
         try:
-            # Calculate reminder time (24 hours before by default)
-            reminder_time = followup_datetime - timedelta(hours=advance_hours)
+            # Calculate reminder time
+            reminder_time = followup_datetime
             
             # Don't schedule if reminder time is in the past
-            if reminder_time <= datetime.now():
+            if reminder_time <= datetime.utcnow():
                 logger.warning(f"Reminder time {reminder_time} is in the past, scheduling immediately")
-                reminder_time = datetime.now() + timedelta(seconds=30)  # Schedule 30 seconds from now
+                reminder_time = datetime.utcnow() + timedelta(seconds=30)  # Schedule 30 seconds from now
             
             # Create job ID
-            job_id = f"followup_reminder_{remainder_id}_{int(datetime.now().timestamp())}"
+            job_id = f"followup_reminder_{remainder_id}_{int(datetime.utcnow().timestamp())}"
             
             # Schedule the job
             job = self.scheduler.add_job(
@@ -216,8 +214,8 @@ class SchedulerService:
                 misfire_grace_time=300  # 5 minutes grace time
             )
             
-            # Update remainder record with job ID
-            self.db.remainders.update_one(
+            # Update followup record with job ID
+            self.db.followups.update_one(
                 {"_id": remainder_id},
                 {"$set": {"scheduled_job_id": job_id}}
             )
@@ -259,18 +257,16 @@ class SchedulerService:
         new_followup_datetime: datetime,
         patient_id: str,
         doctor_id: str,
-        advance_hours: int = 24
     ) -> Optional[str]:
         """
         Reschedule an existing follow-up reminder
         
         Args:
-            remainder_id: Database ID of the remainder record
+            remainder_id: Database ID of the followup record
             old_job_id: Previous job ID to cancel
             new_followup_datetime: New follow-up appointment time
             patient_id: Patient's database ID
             doctor_id: Doctor's database ID
-            advance_hours: Hours before appointment to send reminder
             
         Returns:
             str: New job ID if rescheduled successfully
@@ -281,7 +277,7 @@ class SchedulerService:
             
             # Schedule new job
             new_job_id = await self.schedule_follow_up_reminder(
-                remainder_id, patient_id, doctor_id, new_followup_datetime, advance_hours
+                remainder_id, patient_id, doctor_id, new_followup_datetime
             )
             
             return new_job_id

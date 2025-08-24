@@ -60,7 +60,7 @@ class FollowUpAgent:
             Dict containing the result of the follow-up attempt
         """
         try:
-            patient = self.db.patients.find_one({"_id": ObjectId(patient_id), "doctor_id": doctor_id})
+            patient = self.db.patients.find_one({"_id": ObjectId(patient_id)})
             if not patient:
                 return {"success": False, "error": "Patient not found"}
 

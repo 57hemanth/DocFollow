@@ -7,17 +7,28 @@ from .patients import PyObjectId
 class FollowupBase(BaseModel):
     patient_id: str
     doctor_id: str
-    original_data: List[str]
+    followup_date: datetime
+    message_template: Optional[str] = None
+    status: str = "pending"
+    original_data: Optional[List[str]] = None
     extracted_data: Optional[dict] = None
     ai_draft_message: Optional[str] = None
     doctor_decision: Optional[str] = None
     final_message_sent: bool = False
     created_at: datetime = Field(default_factory=datetime.now)
 
-class FollowupCreate(FollowupBase):
-    pass
+class FollowupCreate(BaseModel):
+    patient_id: str
+    doctor_id: str
+    followup_date: datetime
+    message_template: Optional[str] = None
 
 class FollowupUpdate(BaseModel):
+    doctor_id: str
+    followup_date: Optional[datetime] = None
+    message_template: Optional[str] = None
+    status: Optional[str] = None
+    original_data: Optional[List[str]] = None
     extracted_data: Optional[dict] = None
     ai_draft_message: Optional[str] = None
     doctor_decision: Optional[str] = None

@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from backend.routes import doctors, patients, followups, appointments, settings, webhooks, uploads
-from backend.routes import agents, remainders
+from backend.routes import agents
 from backend.agents import agent_registry
 from backend.services.scheduler_service import scheduler_service
 from fastapi.middleware.cors import CORSMiddleware
@@ -37,7 +37,6 @@ app.include_router(settings.router)
 app.include_router(webhooks.router)
 app.include_router(uploads.router)
 app.include_router(agents.router)
-app.include_router(remainders.router)
 
 @app.on_event("startup")
 async def startup_event():
