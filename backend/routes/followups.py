@@ -149,6 +149,37 @@ async def send_doctor_message(followup_id: str, doctor_id: str, message_content:
     except Exception as e:
         logger.error(f"Error sending doctor message: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/followups/{followup_id}/send-ai-draft", response_model=Dict[str, Any])
+async def send_ai_draft(followup_id: str, doctor_id: str):
+    """
+    Send the AI-drafted message to the patient via WhatsApp.
+    """
+    try:
+        followup = db.followups.find_one({"_id": ObjectId(followup_id), "doctor_id": doctor_id})
+        if not followup:
+            raise HTTPException(status_code=404, detail="Followup not found")
+
+        ai_draft = followup.get("ai_draft_message")
+        if not ai_draft:
+            raise HTTPException(status_code=400, detail="No AI draft message to send")
+
+        patient = db.patients.find_one({"_id": ObjectId(followup["patient_id"])})
+        if not patient:
+            raise HTTPException(status_code=404, detail="Patient not found")
+
+        message_analysis_agent = agent_registry.get_message_analysis_agent()
+        
+        # Using the agent to send the message
+        await message_analysis_agent.doctor_decision(
+            followup_id=followup_id,
+            decision='approve'
+        )
+
+        return {"success": True, "message": "AI draft message sent successfully."}
+    except Exception as e:
+        logger.error(f"Error sending AI draft message: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
         
 @router.get("/followups/stats/{doctor_id}", response_model=Dict[str, Any])
 def get_followup_stats(doctor_id: str):

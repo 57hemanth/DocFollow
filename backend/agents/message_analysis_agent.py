@@ -2,7 +2,7 @@
 Message Analysis Agent for PingDoc - Analyzes patient responses and medical data
 """
 
-from portia import Portia, Config, tool, PlanBuilder
+from portia import Portia, Config, tool, PlanBuilder, LLMProvider
 from backend.config import PORTIA_LLM_PROVIDER, GOOGLE_API_KEY, OPENAI_API_KEY
 from backend.database import db
 from backend.models.patients import Patient
@@ -99,10 +99,7 @@ async def process_patient_response(followup_id: str, patient_id: str, doctor_id:
         if media_urls:
             cloudinary_urls = []
             for url in media_urls:
-                # The content_type can be retrieved from Twilio's webhook data if available,
-                # otherwise we can try to guess it.
-                # For now, let's assume 'image/jpeg' for simplicity.
-                content_type = "image/jpeg" # or you can use mimetypes.guess_type(url)[0]
+                content_type = "image/jpeg" 
                 
                 local_path = await agent._download_twilio_media(url, content_type)
                 if local_path:
@@ -116,16 +113,51 @@ async def process_patient_response(followup_id: str, patient_id: str, doctor_id:
 
                     os.remove(local_path)
             
-            # Update the followup with the new Cloudinary URLs
             if cloudinary_urls:
                 db.followups.update_one(
                     {"_id": ObjectId(followup_id)},
                     {"$addToSet": {"raw_data": {"$each": cloudinary_urls}}}
                 )
 
-        extracted_data = {"text": message_content, "media_count": len(media_urls)}
-        ai_draft = f"AI draft based on patient response: '{message_content}' and {len(media_urls)} media file(s)."
+        # Fetch patient's name to provide context to the AI
+        patient = db.patients.find_one({"_id": ObjectId(patient_id)})
+        patient_name = patient.get("name", "Patient") if patient else "Patient"
+
+        # Analyze the patient's readings to generate a draft message
+        analysis_instruction = f"""
+Analyze the patient's readings from the message below and determine if they are normal or abnormal.
+- If the sugar level is from 0 to 140, consider it normal.
+- If the sugar level is 140 or above, consider it abnormal.
+
+Based on your analysis, generate a message for the patient.
+
+If the readings are normal, the message should be reassuring and advise the patient to continue their medication. For example: "Thank you for sharing the readings. Your readings are normal, please continue the medication."
+
+If the readings are abnormal, the message should be alarming and advise the patient to visit the doctor immediately. For example: "Thank you for sharing the readings. Your readings are abnormal, please visit me immediately for the checkup."
+
+The response should only be the message to the patient, without any preamble.
+
+Patient's name: {patient_name}
+Patient's message: "{message_content}"
+"""
+        config = Config.from_default(llm_provider=LLMProvider.GOOGLE)
+
+        portia = Portia(config=config)
+
+        plan_run = await asyncio.to_thread(portia.run, analysis_instruction)
+        
+        dump = plan_run.model_dump()
+        ai_draft = ""
+        if "outputs" in dump and dump["outputs"]:
+            final_output = dump["outputs"].get("final_output")
+            if final_output and "value" in final_output:
+                ai_draft = final_output["value"]
+
         note = "Patient response has been processed by the agent."
+        extracted_data = {
+            "text": message_content,
+            "media_count": len(media_urls)
+        }
 
         db.followups.update_one(
             {"_id": ObjectId(followup_id)},
@@ -140,7 +172,6 @@ async def process_patient_response(followup_id: str, patient_id: str, doctor_id:
         logger.info(f"Successfully processed and updated followup {followup_id}")
     except Exception as e:
         logger.error(f"Error processing patient response for followup {followup_id}: {e}")
-        # Optionally, update the followup with an error status/note
         db.followups.update_one(
             {"_id": ObjectId(followup_id)},
             {"$set": {"note": f"Agent processing failed: {e}"}}

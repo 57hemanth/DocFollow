@@ -60,7 +60,7 @@ class FollowUpAgent:
             raise ValueError("Patient or Doctor not found")
 
         diagnosis_instructions = {
-            "sugar": "Ask the patient to send their past 3 days' sugar level readings.",
+            "sugar": "Ask the patient to send their past 1 days' sugar level readings.",
             "fever": "Ask for the temperature readings of the patient.",
             "default": "Draft a general follow-up message asking the patient about their well-being."
         }
