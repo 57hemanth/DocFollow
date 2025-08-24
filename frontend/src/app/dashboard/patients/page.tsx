@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import {
   Table,
   TableBody,
@@ -16,10 +17,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
+  DialogClose
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PlusCircle, Loader2 } from 'lucide-react';
+import { PlusCircle, Loader2, Calendar as CalendarIcon } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Patient {
@@ -34,6 +37,7 @@ interface Patient {
 }
 
 export default function Page() {
+  const { data: session } = useSession();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +56,12 @@ export default function Page() {
   const [followupHour, setFollowupHour] = useState<string>('');
   const [followupMinute, setFollowupMinute] = useState<string>('');
   const [followupPeriod, setFollowupPeriod] = useState<string>('AM');
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [isRescheduleDialogOpen, setIsRescheduleDialogOpen] = useState(false);
+  const [newFollowupDate, setNewFollowupDate] = useState<string>('');
+  const [newFollowupHour, setNewFollowupHour] = useState<string>('');
+  const [newFollowupMinute, setNewFollowupMinute] = useState<string>('');
+  const [newFollowupPeriod, setNewFollowupPeriod] = useState<string>('AM');
 
   useEffect(() => {
     const fetchPatients = async () => {
@@ -80,6 +90,54 @@ export default function Page() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       setSelectedFile(e.target.files[0]);
+    }
+  };
+
+  const handleReschedule = async () => {
+    if (!selectedPatient || !newFollowupDate) return;
+    const time = convertTo24Hour(newFollowupHour, newFollowupMinute, newFollowupPeriod);
+    if (!time) {
+      setError("Please select a valid time.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/patients/${selectedPatient._id}/reschedule`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          new_date: newFollowupDate,
+          new_time: time,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to reschedule');
+      }
+
+      // Refresh patients list
+      const fetchPatients = async () => {
+        try {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/patients`);
+          if (!response.ok) {
+            throw new Error('Failed to fetch patients');
+          }
+          const data = await response.json();
+          setPatients(data);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'An unknown error occurred');
+        }
+      };
+      fetchPatients();
+      setIsRescheduleDialogOpen(false);
+      setNewFollowupDate('');
+      setNewFollowupHour('');
+      setNewFollowupMinute('');
+      setNewFollowupPeriod('AM');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
     }
   };
 
@@ -140,6 +198,12 @@ export default function Page() {
     try {
       const followupTime = convertTo24Hour(followupHour, followupMinute, followupPeriod);
       
+      const doctorId = session?.user?.id;
+      if (!doctorId) {
+        setError('Doctor ID not found. Please log in again.');
+        return;
+      }
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/patients`, {
         method: 'POST',
         headers: {
@@ -148,7 +212,7 @@ export default function Page() {
         body: JSON.stringify({ 
           ...newPatient, 
           image_url: imageUrl, 
-          doctor_id: '1', // Hardcoded doctor_id for now
+          doctor_id: doctorId,
           followup_date: followupDate || null,
           followup_time: followupTime || null,
         }),
@@ -263,7 +327,7 @@ export default function Page() {
                       <SelectValue placeholder="Min" />
                     </SelectTrigger>
                     <SelectContent>
-                      {Array.from({ length: 12 }, (_, i) => i * 5).map((minute) => (
+                      {Array.from({ length: 60 }, (_, i) => i).map((minute) => (
                         <SelectItem key={minute} value={minute.toString().padStart(2, '0')}>
                           {minute.toString().padStart(2, '0')}
                         </SelectItem>
@@ -308,6 +372,7 @@ export default function Page() {
               <TableHead>Phone</TableHead>
               <TableHead>Follow-up Date</TableHead>
               <TableHead>Image</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -338,11 +403,95 @@ export default function Page() {
                     />
                   )}
                 </TableCell>
+                <TableCell>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedPatient(patient);
+                      setIsRescheduleDialogOpen(true);
+                    }}
+                  >
+                    Reschedule
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
+
+      <Dialog open={isRescheduleDialogOpen} onOpenChange={setIsRescheduleDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reschedule Follow-up for {selectedPatient?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="newFollowupDate" className="text-right">
+                New Date
+              </Label>
+              <Input
+                id="newFollowupDate"
+                type="date"
+                value={newFollowupDate}
+                onChange={(e) => setNewFollowupDate(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="newFollowupTime" className="text-right">
+                New Time
+              </Label>
+              <div className="col-span-3 flex gap-2">
+                  <Select value={newFollowupHour} onValueChange={setNewFollowupHour}>
+                    <SelectTrigger className="w-20">
+                      <SelectValue placeholder="Hour" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((hour) => (
+                        <SelectItem key={hour} value={hour.toString()}>
+                          {hour.toString().padStart(2, '0')}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  <span className="flex items-center text-gray-600 dark:text-gray-400">:</span>
+                  
+                  <Select value={newFollowupMinute} onValueChange={setNewFollowupMinute}>
+                    <SelectTrigger className="w-20">
+                      <SelectValue placeholder="Min" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 60 }, (_, i) => i).map((minute) => (
+                        <SelectItem key={minute} value={minute.toString().padStart(2, '0')}>
+                          {minute.toString().padStart(2, '0')}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  <Select value={newFollowupPeriod} onValueChange={setNewFollowupPeriod}>
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="AM">AM</SelectItem>
+                      <SelectItem value="PM">PM</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button onClick={handleReschedule}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

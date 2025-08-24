@@ -23,7 +23,7 @@ class PyObjectId(ObjectId):
 
 
 class PatientBase(BaseModel):
-    doctor_id: str
+    doctor_id: PyObjectId = Field(..., alias="doctor_id")
     name: str
     diagnosis: str
     phone: str
@@ -50,3 +50,4 @@ class Patient(PatientBase):
     class Config:
         json_encoders = {ObjectId: str}
         populate_by_name = True
+        arbitrary_types_allowed = True

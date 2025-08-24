@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Body, HTTPException, status
-from typing import List
+from typing import List, Dict, Any
 from backend.schemas.followups import Followup, FollowupCreate, FollowupUpdate
 from backend.database import db
 from bson import ObjectId
+import logging
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.post("/followups", response_model=Followup, status_code=status.HTTP_201_CREATED)
@@ -17,6 +19,58 @@ def create_followup(followup: FollowupCreate):
 def get_followups():
     followups = list(db.followups.find())
     return followups
+
+@router.get("/followups/with-patients", response_model=List[Dict[str, Any]])
+def get_followups_with_patients():
+    """
+    Get all follow-ups with enriched patient data from remainders and patients collections
+    """
+    try:
+        # Get remainders and manually join with patients for more reliable data
+        remainders = list(db.remainders.find())
+        
+        enriched_followups = []
+        for remainder in remainders:
+            # Get patient information - handle ObjectId conversion
+            patient_id = remainder["patient_id"]
+            if isinstance(patient_id, str) and ObjectId.is_valid(patient_id):
+                patient_id = ObjectId(patient_id)
+            patient = db.patients.find_one({"_id": patient_id})
+            
+            # Get followup records for this patient  
+            followup_records = list(db.followups.find({"patient_id": remainder["patient_id"]}))
+            
+            # Build the enriched follow-up record
+            enriched_followup = {
+                "_id": str(remainder["_id"]),
+                "patient_id": str(remainder["patient_id"]),
+                "patient_name": patient["name"] if patient else "Unknown Patient",
+                "patient_phone": patient["phone"] if patient else "N/A", 
+                "patient_diagnosis": patient["diagnosis"] if patient else "N/A",  # Fixed: use 'diagnosis' not 'disease'
+                "followup_date": remainder["followup_date"].isoformat() if hasattr(remainder["followup_date"], 'isoformat') else str(remainder["followup_date"]),
+                "message_template": remainder.get("message_template", ""),
+                "status": remainder.get("status", "pending"),
+                "created_at": remainder["created_at"].isoformat() if hasattr(remainder["created_at"], 'isoformat') else str(remainder["created_at"]),
+                "scheduled_job_id": remainder.get("scheduled_job_id"),
+                "attempts": remainder.get("attempts", 0),
+                "last_attempt": remainder["last_attempt"].isoformat() if remainder.get("last_attempt") and hasattr(remainder["last_attempt"], 'isoformat') else None,
+                "error_message": remainder.get("error_message"),
+                "message_sent": remainder.get("status") == "sent",
+                "response_received": len(followup_records) > 0,
+                "final_message_sent": remainder.get("status") == "completed"
+            }
+            
+            enriched_followups.append(enriched_followup)
+        
+        # Sort by followup_date
+        enriched_followups.sort(key=lambda x: x["followup_date"])
+        
+        logger.info(f"Retrieved {len(enriched_followups)} follow-ups with patient data")
+        return enriched_followups
+        
+    except Exception as e:
+        logger.error(f"Error fetching follow-ups with patients: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch follow-ups: {str(e)}")
 
 @router.get("/followups/{followup_id}", response_model=Followup)
 def get_followup(followup_id: str):

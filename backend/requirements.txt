@@ -7,3 +7,6 @@ python-dotenv
 passlib
 cloudinary
 twilio
+portia-sdk-python
+portia-sdk-python[google]
+apscheduler
