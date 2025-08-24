@@ -8,12 +8,23 @@ from backend.database import db
 from backend.models.patients import Patient
 from backend.models.followups import Followup
 from .whatsapp_tools import send_whatsapp_message
+from backend.services.cloudinary_service import cloudinary_service
 import logging
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 import json
 from bson import ObjectId
 import asyncio
+import os
+import requests
+from dotenv import load_dotenv
+import tempfile
+import mimetypes
+from PIL import Image
+import easyocr
+from pypdf import PdfReader
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -103,14 +114,55 @@ class MessageAnalysisAgent:
             # Initialize Portia with tools
             self.portia = Portia(config=config, tools=tools)
             self.db = db
+            self.twilio_account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+            self.twilio_auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+            self.ocr_reader = easyocr.Reader(['en'])
             
             logger.info("Message Analysis Agent initialized successfully")
             
         except Exception as e:
             logger.error(f"Failed to initialize Message Analysis Agent: {str(e)}")
             raise
-    
-    async def analyze_patient_message(self, patient_id: str, doctor_id: str, message_content: str, image_urls: List[str] = None) -> Dict[str, Any]:
+
+    async def _download_twilio_media(self, media_url: str, content_type: str) -> Optional[str]:
+        """Download media from a Twilio URL."""
+        try:
+            response = requests.get(
+                media_url,
+                auth=(self.twilio_account_sid, self.twilio_auth_token)
+            )
+            response.raise_for_status()
+            
+            extension = mimetypes.guess_extension(content_type) or ""
+            
+            with tempfile.NamedTemporaryFile(delete=False, suffix=extension) as tmp_file:
+                tmp_file.write(response.content)
+                return tmp_file.name
+                
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to download Twilio media: {e}")
+            return None
+
+    async def _extract_text_from_media(self, file_path: str, content_type: str) -> str:
+        """Extract text from an image or PDF file."""
+        try:
+            if content_type.startswith('image'):
+                result = self.ocr_reader.readtext(file_path)
+                return " ".join([text for _, text, _ in result])
+            elif content_type == 'application/pdf':
+                reader = PdfReader(file_path)
+                text = ""
+                for page in reader.pages:
+                    text += page.extract_text() or ""
+                return text
+            else:
+                logger.warning(f"Unsupported media type: {content_type}")
+                return ""
+        except Exception as e:
+            logger.error(f"Failed to extract text from media: {e}")
+            return ""
+
+    async def analyze_patient_message(self, patient_id: str, doctor_id: str, message_content: str, media_items: List[Dict[str, str]] = None) -> Dict[str, Any]:
         """
         Analyze a patient's message/update and extract relevant medical information.
         
@@ -118,7 +170,7 @@ class MessageAnalysisAgent:
             patient_id: Patient's database ID
             doctor_id: Doctor's database ID
             message_content: Patient's text message
-            image_urls: List of image URLs if patient sent photos
+            media_items: List of media items with url and content_type
             
         Returns:
             Dict containing analysis results and extracted data
@@ -128,12 +180,67 @@ class MessageAnalysisAgent:
             if not patient:
                 return {"success": False, "error": "Patient not found"}
 
-            analysis_instruction = f"""
-            You are a medical data analysis agent. Analyze the following message from a patient named {patient['name']} and extract relevant medical data.
-            The patient's message is: "{message_content}"
-            If there are image URLs provided, take them into account: {image_urls}
+            # Find the most recent followup for the patient to maintain a single conversation thread
+            followup = self.db.followups.find_one(
+                {"patient_id": patient_id},
+                sort=[("created_at", -1)]
+            )
 
-            Please extract the data and provide a summary for the doctor. Then, draft a preliminary response to the patient acknowledging their message.
+            if followup:
+                followup_id = followup["_id"]
+                # Keep raw_data as a simple list of URLs
+                raw_data = followup.get("raw_data", [])
+                # Keep extracted_data as a single string
+                extracted_data = followup.get("extracted_data", "")
+            else:
+                followup_id = ObjectId()
+                raw_data = []
+                extracted_data = ""
+
+            # Append the current message to the extracted_data string for context
+            if message_content:
+                extracted_data += f"\nPatient message: {message_content}\n"
+
+            if media_items:
+                for item in media_items:
+                    url = item["url"]
+                    content_type = item["content_type"]
+                    local_path = await self._download_twilio_media(url, content_type)
+                    if local_path:
+                        upload_result = cloudinary_service.upload_file(local_path)
+                        if upload_result:
+                            raw_data.append(upload_result["secure_url"])
+                        
+                        text = await self._extract_text_from_media(local_path, content_type)
+                        if text:
+                            extracted_data += f"\n--- Extracted from document ---\n{text}\n--- End of document ---"
+                        
+                        os.remove(local_path)
+
+            # Update the followup document before calling the analysis agent
+            followup_update_data = {
+                "raw_data": raw_data,
+                "extracted_data": extracted_data,
+                "patient_id": patient_id,
+                "doctor_id": doctor_id,
+                "doctor_decision": "pending_review",
+                "final_message_sent": False,
+            }
+            if not followup:
+                followup_update_data["created_at"] = datetime.now()
+
+            self.db.followups.update_one(
+                {"_id": followup_id},
+                {"$set": followup_update_data},
+                upsert=True
+            )
+
+            analysis_instruction = f"""
+            You are a medical data analysis agent. Analyze the following message from a patient named {patient['name']} who has a condition of {patient.get('disease', 'Not specified')}. 
+            Extract relevant medical data from the following text, which includes patient messages and text extracted from documents:
+            "{extracted_data}"
+
+            Please provide a summary for the doctor. Then, draft a preliminary response to the patient acknowledging their message.
             If the patient's condition seems abnormal or urgent, your drafted response should suggest booking an appointment.
             Return the extracted data, the summary for the doctor, and the drafted patient message.
             """
@@ -143,22 +250,19 @@ class MessageAnalysisAgent:
             # For now, we will assume the output is a string that needs parsing.
             # A more robust solution would be to prompt for JSON.
             output = plan_run.output if hasattr(plan_run, 'output') else str(plan_run)
-
-            followup_record = {
-                "patient_id": patient_id,
-                "doctor_id": doctor_id,
-                "original_data": {"message": message_content, "images": image_urls},
-                "extracted_data": {"raw_analysis": output},
-                "ai_draft_message": output, # Using the full output as the draft for now
-                "doctor_decision": "pending_review",
-                "final_message_sent": False,
-                "created_at": datetime.now()
-            }
-            result = self.db.followups.insert_one(followup_record)
+            
+            # Update the followup with the analysis output
+            self.db.followups.update_one(
+                {"_id": followup_id},
+                {"$set": {
+                    "extracted_data": extracted_data + f"\n\n--- AI Analysis ---\n{output}",
+                    "ai_draft_message": output
+                }}
+            )
             
             return {
                 "success": True, 
-                "followup_id": str(result.inserted_id),
+                "followup_id": str(followup_id),
                 "message": "Patient message analyzed, pending doctor review."
             }
 

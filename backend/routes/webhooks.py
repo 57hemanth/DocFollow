@@ -15,9 +15,7 @@ async def whatsapp_webhook(
     Body: str = Form(...),
     MessageSid: str = Form(...),
     AccountSid: str = Form(...),
-    NumMedia: str = Form("0"),
-    MediaUrl0: Optional[str] = Form(None),
-    MediaContentType0: Optional[str] = Form(None)
+    NumMedia: int = Form(0),
 ):
     """
     Handle incoming WhatsApp messages from Twilio
@@ -26,6 +24,8 @@ async def whatsapp_webhook(
     """
     try:
         logger.info(f"Received WhatsApp message from {From}: {Body}")
+        
+        form_data = await request.form()
         
         patient_phone = From.replace("whatsapp:", "")
         patient = db.patients.find_one({"phone": patient_phone})
@@ -40,13 +40,19 @@ async def whatsapp_webhook(
             logger.error("Message Analysis Agent not available")
             raise HTTPException(status_code=500, detail="Message Analysis Agent not available")
 
-        image_urls = [MediaUrl0] if int(NumMedia) > 0 and MediaUrl0 else []
+        media_items = []
+        if NumMedia > 0:
+            for i in range(NumMedia):
+                media_url = form_data.get(f"MediaUrl{i}")
+                content_type = form_data.get(f"MediaContentType{i}")
+                if media_url:
+                    media_items.append({"url": media_url, "content_type": content_type})
         
         result = await message_analysis_agent.analyze_patient_message(
             patient_id=str(patient["_id"]),
             doctor_id=patient["doctor_id"],
             message_content=Body,
-            image_urls=image_urls
+            media_items=media_items
         )
 
         if not result.get("success"):

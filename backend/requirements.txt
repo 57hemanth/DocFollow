@@ -10,3 +10,5 @@ twilio
 portia-sdk-python
 portia-sdk-python[google]
 apscheduler
+pypdf
+easyocr
