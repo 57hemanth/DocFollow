@@ -4,7 +4,7 @@ from backend.services.whatsapp_service import whatsapp_service
 from typing import Optional
 import logging
 from datetime import datetime
-from backend.agents import agent_registry
+from backend.agents.message_analysis_agent import process_patient_response
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -71,8 +71,10 @@ async def whatsapp_webhook(
                 "updated_at": datetime.now()
             }
         }
-        if media_urls:
-            update_query["$addToSet"] = {"original_data": {"$each": media_urls}}
+        
+        # The agent will handle media processing and updating raw_data
+        # if media_urls:
+        #     update_query["$addToSet"] = {"original_data": {"$each": media_urls}}
 
         update_result = db.followups.update_one({"_id": followup["_id"]}, update_query)
         
@@ -82,13 +84,13 @@ async def whatsapp_webhook(
             return {"status": "error", "message": "Failed to update followup."}
 
         # 2. Trigger asynchronous agent processing
-        message_analysis_agent = agent_registry.get_message_analysis_agent()
-        if message_analysis_agent:
-            await message_analysis_agent.process_patient_response(
-                followup_id=str(followup["_id"]),
-                message_content=Body,
-                media_urls=media_urls
-            )
+        await process_patient_response(
+            followup_id=str(followup["_id"]),
+            patient_id=patient_id,
+            doctor_id=followup["doctor_id"],
+            message_content=Body,
+            media_urls=media_urls
+        )
 
         return {"status": "success", "message": "Patient response received and processing initiated."}
         

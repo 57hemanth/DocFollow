@@ -49,7 +49,7 @@ class FollowUpAgent:
             logger.error(f"Failed to initialize Follow-up Agent: {str(e)}")
             raise
     
-    async def trigger_initial_followup(self, patient_id: str, doctor_id: str, followup_id: str):
+    async def trigger_initial_followup(self, patient_id: str, doctor_id: str, followup_id: str, raw_data: list = None):
         """
         Generates and sends the initial follow-up message using the AI agent.
         """
@@ -66,6 +66,10 @@ class FollowUpAgent:
         }
         instruction = diagnosis_instructions.get(patient.get('disease', '').lower(), diagnosis_instructions['default'])
 
+        raw_data_info = ""
+        if raw_data:
+            raw_data_info = f"The patient has also submitted some data, which has been recorded: {', '.join(raw_data)}. Acknowledge receipt of this data in your message."
+
         prompt = f"""
         You are a medical assistant for Dr. {doctor['name']}.
         Your task is to send a follow-up message to a patient named {patient['name']} via WhatsApp.
@@ -73,6 +77,8 @@ class FollowUpAgent:
         The followup ID is {followup_id}. You must use this ID when sending the message.
         
         Based on the patient's condition ({patient.get('disease', 'N/A')}), here is your instruction: "{instruction}"
+        
+        {raw_data_info}
 
         Please compose a friendly, professional, and clear WhatsApp message based on this instruction, and then send it to the patient's phone number using the available tool.
         """

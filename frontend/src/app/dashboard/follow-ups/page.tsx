@@ -12,7 +12,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, User, MessageSquare, Send, X, ClipboardList } from 'lucide-react';
+import { RefreshCw, User, MessageSquare, Send, X, ClipboardList, FileText } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -38,7 +38,7 @@ interface FollowUp {
   doctor_id: string;
   status: 'waiting_for_patient' | 'waiting_for_doctor' | 'closed';
   history: Message[];
-  original_data?: string[];
+  raw_data?: string[];
   extracted_data?: Record<string, any>;
   ai_draft_message?: string;
   note?: string;
@@ -251,6 +251,8 @@ const FollowUpDetailsDialog = ({ followup, isOpen, onClose, onSendMessage }: Dia
     }
   };
 
+  if (!followup) return null;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-6xl w-full h-[90vh] flex flex-col">
@@ -267,15 +269,25 @@ const FollowUpDetailsDialog = ({ followup, isOpen, onClose, onSendMessage }: Dia
             <h3 className="font-semibold text-lg flex items-center"><ClipboardList className="mr-2" /> Patient Submitted Data</h3>
             
             {/* Raw Data Previews */}
-            {followup.original_data && followup.original_data.length > 0 && (
+            {followup.raw_data && followup.raw_data.length > 0 && (
               <div className="space-y-2">
                 <h4 className="font-semibold">Attachments</h4>
                 <div className="grid grid-cols-2 gap-2">
-                  {followup.original_data.map((url, index) => (
-                    <a key={index} href={url} target="_blank" rel="noopener noreferrer" className="block border rounded-md overflow-hidden hover:opacity-80 transition-opacity">
-                      <img src={url} alt={`Patient submission ${index + 1}`} className="w-full h-auto object-cover" />
-                    </a>
-                  ))}
+                  {followup.raw_data.map((url, index) => {
+                    const isPdf = url.toLowerCase().endsWith('.pdf');
+                    return (
+                      <a key={index} href={url} target="_blank" rel="noopener noreferrer" className="block border rounded-md overflow-hidden hover:opacity-80 transition-opacity">
+                        {isPdf ? (
+                          <div className="p-4 bg-gray-100 flex flex-col items-center justify-center h-full">
+                            <FileText className="w-8 h-8 text-red-500" />
+                            <span className="mt-2 text-sm text-center">View PDF</span>
+                          </div>
+                        ) : (
+                          <img src={url} alt={`Patient submission ${index + 1}`} className="w-full h-auto object-cover" />
+                        )}
+                      </a>
+                    );
+                  })}
                 </div>
               </div>
             )}

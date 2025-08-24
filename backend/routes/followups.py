@@ -20,6 +20,7 @@ async def create_followup(followup_data: FollowupCreate):
         new_followup = Followup(
             patient_id=followup_data.patient_id,
             doctor_id=followup_data.doctor_id,
+            raw_data=followup_data.raw_data,
             status="creating", # Temporary status
         )
 
@@ -31,7 +32,8 @@ async def create_followup(followup_data: FollowupCreate):
         await follow_up_agent.trigger_initial_followup(
             patient_id=followup_data.patient_id,
             doctor_id=followup_data.doctor_id,
-            followup_id=followup_id
+            followup_id=followup_id,
+            raw_data=followup_data.raw_data
         )
 
         return {

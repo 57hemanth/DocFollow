@@ -14,7 +14,7 @@ class FollowupBase(BaseModel):
     doctor_id: str
     status: str = "waiting_for_patient"
     history: List[Message] = []
-    original_data: List[str] = []
+    raw_data: List[str] = []
     extracted_data: Optional[Dict[str, Any]] = None
     note: Optional[str] = None
     ai_draft_message: Optional[str] = None
@@ -25,11 +25,12 @@ class FollowupBase(BaseModel):
 class FollowupCreate(BaseModel):
     patient_id: str
     doctor_id: str
+    raw_data: List[str] = []
 
 class FollowupUpdate(BaseModel):
     status: Optional[str] = None
     history: Optional[List[Message]] = None
-    original_data: Optional[List[str]] = None
+    raw_data: Optional[List[str]] = None
     extracted_data: Optional[Dict[str, Any]] = None
     note: Optional[str] = None
     ai_draft_message: Optional[str] = None
