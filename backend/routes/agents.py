@@ -109,26 +109,6 @@ async def send_custom_follow_up(request: CustomMessageRequest):
         logger.error(f"Error sending custom follow-up: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/follow-up/batch")
-async def send_batch_follow_up_reminders(request: BatchFollowUpRequest):
-    """Send follow-up reminders to all patients with upcoming appointments"""
-    try:
-        result = await agent_registry.batch_follow_up_reminders(
-            request.doctor_id,
-            request.days_ahead
-        )
-        
-        if result.get("success"):
-            return result
-        else:
-            raise HTTPException(status_code=400, detail=result.get("error", "Unknown error"))
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error sending batch follow-up reminders: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 @router.post("/message/analyze")
 async def analyze_patient_message(request: PatientMessageRequest):
     """Analyze an incoming patient message and generate response draft"""

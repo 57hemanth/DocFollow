@@ -5,6 +5,7 @@ Agent Registry for PingDoc - Central management of all AI agents
 from typing import Dict, Any, Optional
 from .follow_up_agent import FollowUpAgent
 from .message_analysis_agent import MessageAnalysisAgent
+from backend.database import db
 import logging
 
 logger = logging.getLogger(__name__)
@@ -125,7 +126,7 @@ class AgentRegistry:
             return {"success": False, "error": "Message analysis agent not available"}
         
         try:
-            return message_agent.analyze_patient_message(
+            return await message_agent.analyze_patient_message(
                 patient_id, doctor_id, message_content, image_urls
             )
         except Exception as e:
@@ -152,9 +153,80 @@ class AgentRegistry:
             return {"success": False, "error": "Message analysis agent not available"}
         
         try:
-            return message_agent.doctor_decision(followup_id, decision, custom_message)
+            return await message_agent.doctor_decision(followup_id, decision, custom_message)
         except Exception as e:
             logger.error(f"Error processing doctor's decision: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    async def send_follow_up_reminder(self, patient_id: str, doctor_id: str, follow_up_date: str) -> Dict[str, Any]:
+        """
+        Send a follow-up reminder to a patient
+        
+        Args:
+            patient_id: Patient's database ID
+            doctor_id: Doctor's database ID
+            follow_up_date: The date of the follow-up
+            
+        Returns:
+            Dict containing the result of the operation
+        """
+        if not self._initialized:
+            return {"success": False, "error": "Agent registry not initialized"}
+        
+        follow_up_agent = self.get_follow_up_agent()
+        if not follow_up_agent:
+            return {"success": False, "error": "Follow-up agent not available"}
+        
+        try:
+            # This is a placeholder for a more complex implementation
+            return await follow_up_agent.trigger_follow_up(patient_id, doctor_id)
+        except Exception as e:
+            logger.error(f"Error sending follow-up reminder: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    async def approve_and_send_response(self, followup_id: str, final_message: str, doctor_id: str) -> Dict[str, Any]:
+        """
+        Approve and send a response message to a patient
+        
+        Args:
+            followup_id: The ID of the followup
+            final_message: The final message to be sent
+            doctor_id: The ID of the doctor
+            
+        Returns:
+            Dict containing the result of the operation
+        """
+        if not self._initialized:
+            return {"success": False, "error": "Agent registry not initialized"}
+        
+        message_agent = self.get_message_analysis_agent()
+        if not message_agent:
+            return {"success": False, "error": "Message analysis agent not available"}
+        
+        try:
+            return await message_agent.doctor_decision(followup_id, 'approve', final_message)
+        except Exception as e:
+            logger.error(f"Error approving and sending response: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    async def get_pending_doctor_reviews(self, doctor_id: str) -> Dict[str, Any]:
+        """
+        Get all followups pending doctor review
+        
+        Args:
+            doctor_id: The ID of the doctor
+            
+        Returns:
+            Dict containing the list of pending reviews
+        """
+        if not self._initialized:
+            return {"success": False, "error": "Agent registry not initialized"}
+        
+        try:
+            pending_reviews = list(db.followups.find({"doctor_id": doctor_id, "doctor_decision": "pending_review"}))
+            return {"success": True, "reviews": pending_reviews}
+        except Exception as e:
+            logger.error(f"Error getting pending reviews: {str(e)}")
             return {"success": False, "error": str(e)}
 
 # Global instance - will be initialized when the server starts

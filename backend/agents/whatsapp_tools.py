@@ -29,15 +29,7 @@ def send_whatsapp_message(
         str: Success message with message SID or error description
     """
     try:
-        # Run the async function
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-        result = loop.run_until_complete(
-            whatsapp_service.send_message(patient_phone, message)
-        )
-        
-        loop.close()
+        result = asyncio.run(whatsapp_service.send_message(patient_phone, message))
         
         if result.get("success"):
             return f"✅ WhatsApp message sent successfully! Message SID: {result.get('message_sid')}"
@@ -71,17 +63,9 @@ def send_follow_up_reminder(
         str: Success message with details or error description
     """
     try:
-        # Run the async function
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-        result = loop.run_until_complete(
-            whatsapp_service.send_follow_up_reminder(
-                patient_phone, patient_name, doctor_name, follow_up_date
-            )
-        )
-        
-        loop.close()
+        result = asyncio.run(whatsapp_service.send_follow_up_reminder(
+            patient_phone, patient_name, doctor_name, follow_up_date
+        ))
         
         if result.get("success"):
             return f"✅ Follow-up reminder sent to {patient_name} successfully! Message SID: {result.get('message_sid')}"

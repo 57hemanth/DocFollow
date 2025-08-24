@@ -31,7 +31,7 @@ def _cleanup_old_jobs():
     except Exception as e:
         logger.error(f"❌ Error in cleanup job: {str(e)}")
 
-def _send_follow_up_reminder(
+async def _send_follow_up_reminder(
     followup_id: str,
     patient_id: str,
     doctor_id: str,
@@ -66,7 +66,7 @@ def _send_follow_up_reminder(
         if not follow_up_agent:
             raise Exception("Follow-up agent not available")
 
-        result = follow_up_agent.trigger_follow_up(patient_id, doctor_id)
+        result = await follow_up_agent.trigger_follow_up(patient_id, doctor_id)
         
         if result.get("success"):
             # Update followup status to sent

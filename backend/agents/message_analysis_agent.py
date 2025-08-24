@@ -13,6 +13,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 import json
 from bson import ObjectId
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +110,7 @@ class MessageAnalysisAgent:
             logger.error(f"Failed to initialize Message Analysis Agent: {str(e)}")
             raise
     
-    def analyze_patient_message(self, patient_id: str, doctor_id: str, message_content: str, image_urls: List[str] = None) -> Dict[str, Any]:
+    async def analyze_patient_message(self, patient_id: str, doctor_id: str, message_content: str, image_urls: List[str] = None) -> Dict[str, Any]:
         """
         Analyze a patient's message/update and extract relevant medical information.
         
@@ -137,7 +138,7 @@ class MessageAnalysisAgent:
             Return the extracted data, the summary for the doctor, and the drafted patient message.
             """
             
-            plan_run = self.portia.run(analysis_instruction)
+            plan_run = await asyncio.to_thread(self.portia.run, analysis_instruction)
             
             # For now, we will assume the output is a string that needs parsing.
             # A more robust solution would be to prompt for JSON.
@@ -165,7 +166,7 @@ class MessageAnalysisAgent:
             logger.error(f"Error analyzing patient message: {str(e)}")
             return {"success": False, "error": str(e)}
 
-    def doctor_decision(self, followup_id: str, decision: str, custom_message: str = None) -> Dict[str, Any]:
+    async def doctor_decision(self, followup_id: str, decision: str, custom_message: str = None) -> Dict[str, Any]:
         """
         Process the doctor's decision on a followup.
         
@@ -197,7 +198,7 @@ class MessageAnalysisAgent:
                 return {"success": False, "error": "Invalid decision."}
 
             prompt = f"Send the following WhatsApp message to the patient named {patient['name']} at the phone number {patient['phone']}: '{message_to_send}'"
-            self.portia.run(prompt)
+            await asyncio.to_thread(self.portia.run, prompt)
 
             self.db.followups.update_one(
                 {"_id": ObjectId(followup_id)},

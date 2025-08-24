@@ -12,6 +12,7 @@ import logging
 from datetime import datetime
 from typing import Dict, Any
 from bson import ObjectId
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ class FollowUpAgent:
             logger.error(f"Failed to initialize Follow-up Agent: {str(e)}")
             raise
     
-    def trigger_follow_up(self, patient_id: str, doctor_id: str) -> Dict[str, Any]:
+    async def trigger_follow_up(self, patient_id: str, doctor_id: str) -> Dict[str, Any]:
         """
         Trigger a follow-up for a patient based on their diagnosis.
         
@@ -87,7 +88,7 @@ class FollowUpAgent:
             Please compose a friendly, professional, and clear WhatsApp message based on this instruction, and then send it to the patient's phone number.
             """
 
-            plan_run = self.portia.run(prompt)
+            plan_run = await asyncio.to_thread(self.portia.run, prompt)
             
             follow_up_record = {
                 "patient_id": patient_id,

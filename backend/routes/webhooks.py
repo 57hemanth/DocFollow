@@ -42,7 +42,7 @@ async def whatsapp_webhook(
 
         image_urls = [MediaUrl0] if int(NumMedia) > 0 and MediaUrl0 else []
         
-        result = message_analysis_agent.analyze_patient_message(
+        result = await message_analysis_agent.analyze_patient_message(
             patient_id=str(patient["_id"]),
             doctor_id=patient["doctor_id"],
             message_content=Body,
