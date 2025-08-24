@@ -64,7 +64,7 @@ class FollowUpAgent:
             "fever": "Ask for the temperature readings of the patient.",
             "default": "Draft a general follow-up message asking the patient about their well-being."
         }
-        instruction = diagnosis_instructions.get(patient.get('disease', '').lower(), diagnosis_instructions['default'])
+        instruction = diagnosis_instructions.get(patient.get('diagnosis', '').lower(), diagnosis_instructions['default'])
 
         raw_data_info = ""
         if raw_data:
@@ -76,7 +76,7 @@ class FollowUpAgent:
         The patient's phone number is {patient['phone']}.
         The followup ID is {followup_id}. You must use this ID when sending the message.
         
-        Based on the patient's condition ({patient.get('disease', 'N/A')}), here is your instruction: "{instruction}"
+        Based on the patient's condition ({patient.get('diagnosis', 'N/A')}), here is your instruction: "{instruction}"
         
         {raw_data_info}
 
