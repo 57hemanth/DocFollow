@@ -69,6 +69,17 @@ class FollowUpAgent:
             if not doctor:
                 return {"success": False, "error": "Doctor not found"}
 
+            # Create a preliminary follow-up record to get an ID
+            preliminary_follow_up = {
+                "patient_id": patient_id,
+                "doctor_id": doctor_id,
+                "status": "pending",
+                "created_at": datetime.now(),
+                "followup_date": datetime.now() # Placeholder, can be updated later
+            }
+            result = self.db.followups.insert_one(preliminary_follow_up)
+            followup_id = str(result.inserted_id)
+
             # Define diagnosis-based instructions
             diagnosis_instructions = {
                 "sugar": "Ask the patient to send their past 3 days' sugar level readings.",
@@ -82,6 +93,7 @@ class FollowUpAgent:
             You are a medical assistant for Dr. {doctor['name']}.
             Your task is to send a follow-up message to a patient named {patient['name']} via WhatsApp.
             The patient's phone number is {patient['phone']}.
+            The followup ID is {followup_id}. You must use this ID when sending the message.
             
             Based on the patient's condition, here is the instruction for the message: "{instruction}"
 
@@ -90,20 +102,22 @@ class FollowUpAgent:
 
             plan_run = await asyncio.to_thread(self.portia.run, prompt)
             
-            follow_up_record = {
-                "patient_id": patient_id,
-                "doctor_id": doctor_id,
-                "ai_draft_message": f"Follow-up for {patient.get('diagnosis', 'N/A')} triggered.",
-                "doctor_decision": "automated",
-                "final_message_sent": True,
-                "created_at": datetime.now()
-            }
-            self.db.followups.insert_one(follow_up_record)
+            # Update the follow-up record with more details
+            self.db.followups.update_one(
+                {"_id": ObjectId(followup_id)},
+                {"$set": {
+                    "ai_draft_message": f"Follow-up for {patient.get('diagnosis', 'N/A')} triggered.",
+                    "doctor_decision": "automated",
+                    "final_message_sent": True, # Assuming the agent sends it
+                    "status": "sent"
+                }}
+            )
             
             return {
                 "success": True, 
                 "message": f"Follow-up triggered for {patient['name']}",
-                "plan_run_id": plan_run.id if hasattr(plan_run, 'id') else None
+                "plan_run_id": plan_run.id if hasattr(plan_run, 'id') else None,
+                "followup_id": followup_id
             }
 
         except Exception as e:

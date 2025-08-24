@@ -1,6 +1,9 @@
 from twilio.rest import Client
 from twilio.base.exceptions import TwilioException
 from backend.config import TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_NUMBER
+from backend.database import db
+from backend.models.followups import Message
+from typing import Optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,13 +20,14 @@ class WhatsAppService:
         """Check if Twilio is properly configured"""
         return self.client is not None
     
-    async def send_message(self, to_number: str, message: str) -> dict:
+    async def send_message(self, to_number: str, message: str, followup_id: Optional[str] = None) -> dict:
         """
         Send WhatsApp message via Twilio Sandbox
         
         Args:
             to_number: Phone number in format "+1234567890"
             message: Message content to send
+            followup_id: Optional ID of the followup to associate the message with
             
         Returns:
             dict: Response with success status and message_sid or error
@@ -39,17 +43,24 @@ class WhatsAppService:
             if not to_number.startswith("whatsapp:"):
                 to_number = f"whatsapp:{to_number}"
             
-            message = self.client.messages.create(
+            response = self.client.messages.create(
                 from_=TWILIO_WHATSAPP_NUMBER,
                 body=message,
                 to=to_number
             )
             
-            logger.info(f"WhatsApp message sent successfully. SID: {message.sid}")
+            if followup_id:
+                history_entry = Message(sender="agent", content=message)
+                db.followups.update_one(
+                    {"_id": followup_id},
+                    {"$push": {"history": history_entry.dict()}}
+                )
+
+            logger.info(f"WhatsApp message sent successfully. SID: {response.sid}")
             return {
                 "success": True,
-                "message_sid": message.sid,
-                "status": message.status
+                "message_sid": response.sid,
+                "status": response.status
             }
             
         except TwilioException as e:
@@ -65,7 +76,7 @@ class WhatsAppService:
                 "error": f"Unexpected error: {str(e)}"
             }
     
-    async def send_follow_up_reminder(self, patient_phone: str, patient_name: str, doctor_name: str, follow_up_date: str) -> dict:
+    async def send_follow_up_reminder(self, patient_phone: str, patient_name: str, doctor_name: str, follow_up_date: str, followup_id: Optional[str] = None) -> dict:
         """
         Send a follow-up reminder message to patient
         
@@ -74,6 +85,7 @@ class WhatsAppService:
             patient_name: Patient's name
             doctor_name: Doctor's name
             follow_up_date: Follow-up date string
+            followup_id: Optional ID of the followup to associate the message with
             
         Returns:
             dict: Response with success status
@@ -96,20 +108,21 @@ Best regards,
 Dr. {doctor_name}'s Team
         """.strip()
         
-        return await self.send_message(patient_phone, message)
+        return await self.send_message(patient_phone, message, followup_id=followup_id)
     
-    async def send_custom_message(self, patient_phone: str, message: str) -> dict:
+    async def send_custom_message(self, patient_phone: str, message: str, followup_id: Optional[str] = None) -> dict:
         """
         Send a custom message to patient
         
         Args:
             patient_phone: Patient's phone number
             message: Custom message content
+            followup_id: Optional ID of the followup to associate the message with
             
         Returns:
             dict: Response with success status
         """
-        return await self.send_message(patient_phone, message)
+        return await self.send_message(patient_phone, message, followup_id=followup_id)
     
     def get_sandbox_instructions(self) -> dict:
         """

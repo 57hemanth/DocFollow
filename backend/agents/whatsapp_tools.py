@@ -2,7 +2,7 @@
 Portia tools for WhatsApp messaging through Twilio
 """
 
-from typing import Annotated
+from typing import Annotated, Optional
 from portia import tool
 from backend.services.whatsapp_service import whatsapp_service
 import asyncio
@@ -13,7 +13,8 @@ logger = logging.getLogger(__name__)
 @tool
 def send_whatsapp_message(
     patient_phone: Annotated[str, "The patient's phone number in E.164 format (e.g., +1234567890)"],
-    message: Annotated[str, "The message content to send to the patient"]
+    message: Annotated[str, "The message content to send to the patient"],
+    followup_id: Annotated[Optional[str], "The ID of the followup to associate the message with"] = None
 ) -> str:
     """
     Sends a WhatsApp message to a patient's phone number using Twilio.
@@ -24,12 +25,13 @@ def send_whatsapp_message(
     Args:
         patient_phone: Phone number in E.164 format (e.g., +1234567890)
         message: The message content to send
+        followup_id: The ID of the followup to associate the message with
         
     Returns:
         str: Success message with message SID or error description
     """
     try:
-        result = asyncio.run(whatsapp_service.send_message(patient_phone, message))
+        result = asyncio.run(whatsapp_service.send_message(patient_phone, message, followup_id=followup_id))
         
         if result.get("success"):
             return f"✅ WhatsApp message sent successfully! Message SID: {result.get('message_sid')}"
@@ -45,7 +47,8 @@ def send_follow_up_reminder(
     patient_phone: Annotated[str, "The patient's phone number in E.164 format"],
     patient_name: Annotated[str, "The patient's full name"],
     doctor_name: Annotated[str, "The doctor's name"],
-    follow_up_date: Annotated[str, "The follow-up appointment date and time"]
+    follow_up_date: Annotated[str, "The follow-up appointment date and time"],
+    followup_id: Annotated[Optional[str], "The ID of the followup to associate the message with"] = None
 ) -> str:
     """
     Sends a structured follow-up reminder message to a patient via WhatsApp.
@@ -58,13 +61,14 @@ def send_follow_up_reminder(
         patient_name: Patient's full name for personalization
         doctor_name: Doctor's name for the clinic identification
         follow_up_date: Date and time of the follow-up appointment
+        followup_id: The ID of the followup to associate the message with
         
     Returns:
         str: Success message with details or error description
     """
     try:
         result = asyncio.run(whatsapp_service.send_follow_up_reminder(
-            patient_phone, patient_name, doctor_name, follow_up_date
+            patient_phone, patient_name, doctor_name, follow_up_date, followup_id=followup_id
         ))
         
         if result.get("success"):

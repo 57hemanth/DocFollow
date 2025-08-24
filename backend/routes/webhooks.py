@@ -3,6 +3,7 @@ from backend.database import db
 from backend.services.whatsapp_service import whatsapp_service
 from typing import Optional
 import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -34,6 +35,25 @@ async def whatsapp_webhook(
             logger.warning(f"No patient found with phone number: {patient_phone}")
             return {"status": "success", "message": "Patient not found"}
         
+        # Find the most recent active followup for this patient
+        followup = db.followups.find_one(
+            {"patient_id": str(patient["_id"]), "status": {"$in": ["pending", "sent", "processing"]}},
+            sort=[("created_at", -1)]
+        )
+        
+        if followup:
+            history_entry = {
+                "sender": "patient",
+                "content": Body,
+                "timestamp": datetime.now()
+            }
+            db.followups.update_one(
+                {"_id": followup["_id"]},
+                {"$push": {"history": history_entry}}
+            )
+        else:
+            logger.warning(f"No active followup found for patient {patient['_id']}")
+
         from backend.agents import agent_registry
         message_analysis_agent = agent_registry.get_message_analysis_agent()
         if not message_analysis_agent:

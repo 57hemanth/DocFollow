@@ -1,6 +1,11 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
+
+class Message(BaseModel):
+    sender: str  # "agent" or "patient"
+    content: str
+    timestamp: datetime = Field(default_factory=datetime.now)
 
 class Followup(BaseModel):
     patient_id: str
@@ -8,6 +13,7 @@ class Followup(BaseModel):
     followup_date: datetime
     message_template: Optional[str] = None
     status: str = "pending"  # pending, sent, completed, failed
+    history: List[Message] = []
     original_data: Optional[List[str]] = None
     extracted_data: Optional[dict] = None
     ai_draft_message: Optional[str] = None
@@ -33,3 +39,4 @@ class FollowupUpdate(BaseModel):
     ai_draft_message: Optional[str] = None
     doctor_decision: Optional[str] = None
     final_message_sent: Optional[bool] = None
+    history: Optional[List[Message]] = None
