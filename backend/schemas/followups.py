@@ -26,6 +26,7 @@ class FollowupCreate(BaseModel):
     patient_id: str
     doctor_id: str
     raw_data: List[str] = []
+    followup_date: Optional[datetime] = None
 
 class FollowupUpdate(BaseModel):
     status: Optional[str] = None

@@ -66,7 +66,7 @@ async def _send_follow_up_reminder(
         if not follow_up_agent:
             raise Exception("Follow-up agent not available")
 
-        result = await follow_up_agent.trigger_follow_up(patient_id, doctor_id)
+        result = await follow_up_agent.trigger_follow_up(patient_id, doctor_id, followup_id)
         
         if result.get("success"):
             # Update followup status to sent

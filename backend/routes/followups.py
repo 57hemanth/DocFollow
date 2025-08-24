@@ -4,6 +4,7 @@ from backend.schemas.followups import Followup, FollowupCreate, FollowupUpdate
 from backend.database import db
 from bson import ObjectId
 from backend.agents import agent_registry
+from backend.services.scheduler_service import scheduler_service
 import logging
 from datetime import datetime
 
@@ -17,24 +18,40 @@ async def create_followup(followup_data: FollowupCreate):
     """
     try:
         # 1. Create the preliminary followup document
-        new_followup = Followup(
-            patient_id=followup_data.patient_id,
-            doctor_id=followup_data.doctor_id,
-            raw_data=followup_data.raw_data,
-            status="creating", # Temporary status
-        )
+        if followup_data.followup_date:
+            new_followup = Followup(
+                patient_id=followup_data.patient_id,
+                doctor_id=followup_data.doctor_id,
+                raw_data=followup_data.raw_data,
+                status="scheduled", # Temporary status
+            )
+        else:
+            new_followup = Followup(
+                patient_id=followup_data.patient_id,
+                doctor_id=followup_data.doctor_id,
+                raw_data=followup_data.raw_data,
+                status="creating", # Temporary status
+            )
 
         result = db.followups.insert_one(new_followup.dict(by_alias=True, exclude={"id"}))
         followup_id = str(result.inserted_id)
 
         # 2. Trigger agent to generate and send initial message
-        follow_up_agent = agent_registry.get_follow_up_agent()
-        await follow_up_agent.trigger_initial_followup(
-            patient_id=followup_data.patient_id,
-            doctor_id=followup_data.doctor_id,
-            followup_id=followup_id,
-            raw_data=followup_data.raw_data
-        )
+        if followup_data.followup_date:
+            await scheduler_service.schedule_follow_up_reminder(
+                remainder_id=followup_id,
+                patient_id=followup_data.patient_id,
+                doctor_id=followup_data.doctor_id,
+                followup_datetime=followup_data.followup_date,
+            )
+        else:
+            follow_up_agent = agent_registry.get_follow_up_agent()
+            await follow_up_agent.trigger_follow_up(
+                patient_id=followup_data.patient_id,
+                doctor_id=followup_data.doctor_id,
+                followup_id=followup_id,
+                raw_data=followup_data.raw_data
+            )
 
         return {
             "success": True,

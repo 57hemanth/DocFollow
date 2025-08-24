@@ -49,7 +49,7 @@ class FollowUpAgent:
             logger.error(f"Failed to initialize Follow-up Agent: {str(e)}")
             raise
     
-    async def trigger_initial_followup(self, patient_id: str, doctor_id: str, followup_id: str, raw_data: list = None):
+    async def trigger_follow_up(self, patient_id: str, doctor_id: str, followup_id: str, raw_data: list = None):
         """
         Generates and sends the initial follow-up message using the AI agent.
         """
