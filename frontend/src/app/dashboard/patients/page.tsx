@@ -22,8 +22,9 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PlusCircle, Loader2, Calendar as CalendarIcon } from 'lucide-react';
+import { PlusCircle, Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import Image from 'next/image';
 
 interface Patient {
   _id: string;
@@ -418,10 +419,12 @@ export default function Page() {
                 </TableCell>
                 <TableCell>
                   {patient.image_url && (
-                    <img
+                    <Image
                       src={patient.image_url}
                       alt={patient.name}
                       className="h-10 w-10 rounded-lg object-cover"
+                      width={40}
+                      height={40}
                     />
                   )}
                 </TableCell>

@@ -14,11 +14,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
+import Image from "next/image"
 
 // This is sample data.
 const data = {
@@ -54,10 +52,12 @@ export function AppSidebar() {
               <a href="#">
                 <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
                   {session?.user?.image ? (
-                    <img
+                    <Image
                       src={session.user.image}
                       alt={session.user.name ?? "user-image"}
                       className="size-8 rounded-lg"
+                      width={32}
+                      height={32}
                     />
                   ) : (
                     <Stethoscope className="size-4" />

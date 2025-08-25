@@ -1,4 +1,5 @@
-import NextAuth, { AuthOptions } from "next-auth"
+import NextAuth, { AuthOptions, User, Session } from "next-auth"
+import { JWT } from "next-auth/jwt"
 import GoogleProvider from "next-auth/providers/google"
 import CredentialsProvider from "next-auth/providers/credentials"
 import clientPromise from "@/lib/mongodb"
@@ -75,13 +76,13 @@ export const authOptions: AuthOptions = {
       await db.collection("doctors").insertOne(newDoctor)
       return true
     },
-    async jwt({ token, user }: { token: any; user: any }) {
+    async jwt({ token, user }: { token: JWT; user: User }) {
       if (user) {
         token.id = user.id
       }
       return token
     },
-    async session({ session, token }: { session: any; token: any }) {
+    async session({ session, token }: { session: Session; token: JWT }) {
       if (session.user) {
         session.user.id = token.id as string
       }

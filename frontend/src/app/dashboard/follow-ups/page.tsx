@@ -12,19 +12,19 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, User, MessageSquare, Send, X, ClipboardList, FileText } from 'lucide-react';
+import { RefreshCw, MessageSquare, Send, ClipboardList, FileText } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogClose,
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { useSession } from 'next-auth/react';
 import { format } from 'date-fns';
+import Image from 'next/image';
 
 interface Message {
   sender: 'patient' | 'agent' | 'doctor';
@@ -39,7 +39,7 @@ interface FollowUp {
   status: 'waiting_for_patient' | 'waiting_for_doctor' | 'closed';
   history: Message[];
   raw_data?: string[];
-  extracted_data?: Record<string, any>;
+  extracted_data?: { text?: string };
   ai_draft_message?: string;
   note?: string;
   created_at: string;
@@ -308,7 +308,7 @@ const FollowUpDetailsDialog = ({ followup, isOpen, onClose, onSendMessage, onBoo
                             <span className="mt-2 text-sm text-center">View PDF</span>
                           </div>
                         ) : (
-                          <img src={url} alt={`Patient submission ${index + 1}`} className="w-full h-auto object-cover" />
+                          <Image src={url} alt={`Patient submission ${index + 1}`} className="w-full h-auto object-cover" width={200} height={200} />
                         )}
                       </a>
                     );

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronRight, MessageSquare, FileText, UserCheck, Calendar, Menu, X, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 const Home = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -222,7 +223,7 @@ const Home = () => {
                     background: `linear-gradient(135deg, ${colors.background} 0%, ${colors.secondary}30 100%)`
                   }}
                 >
-                  <img src="/dashboard.png" alt="Dashboard" className="w-full h-full object-contain" />
+                  <Image src="/dashboard.png" alt="Dashboard" className="w-full h-full object-contain" width={800} height={600} />
                   {/* <div className="text-center">
                     <div 
                       className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"

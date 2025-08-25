@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { useSession } from "next-auth/react";
 
 interface WhatsAppSandboxInfo {
@@ -21,7 +20,7 @@ interface Settings {
   whatsapp_number?: string;
   whatsapp_sandbox_id?: string;
   google_calendar_connected: boolean;
-  notifications?: any;
+  notifications?: unknown;
 }
 
 export default function SettingsPage() {

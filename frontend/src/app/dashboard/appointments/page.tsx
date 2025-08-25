@@ -25,21 +25,6 @@ interface AppointmentDetails {
   end_time: string;
 }
 
-interface Appointment {
-  _id: string;
-  patient_id: string;
-  doctor_id: string;
-  followup_id: string;
-  event_title: string;
-  start_time: string;
-  end_time: string;
-  status: string;
-  patient: {
-    _id: string;
-    name: string;
-  };
-}
-
 interface FollowUp {
   _id: string;
   patient_id: {
@@ -94,8 +79,8 @@ export default function Page() {
 
         setCompletedFollowUps(completedData);
         setSchedulingFollowUps(schedulingData);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err) {
+        setError((err as Error).message);
       } finally {
         setLoading(false);
       }
