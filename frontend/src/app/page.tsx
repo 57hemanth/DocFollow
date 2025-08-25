@@ -155,7 +155,7 @@ const Home = () => {
             <h1 className="text-5xl lg:text-7xl font-bold mb-6 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-200" style={{ color: '#111827' }}>
               AI that follows up,
               <span 
-                className="block text-transparent bg-clip-text"
+                className="block text-transparent bg-clip-text pb-2"
                 style={{ 
                   backgroundImage: `linear-gradient(to right, ${colors.primary}, #074a61)`,
                   WebkitBackgroundClip: 'text',
