@@ -39,3 +39,12 @@ class Doctor(DoctorBase):
     class Config:
         json_encoders = {ObjectId: str}
         populate_by_name = True
+
+class DoctorUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    whatsapp_connected: Optional[bool] = None
+    whatsapp_number: Optional[str] = None
+    whatsapp_sandbox_id: Optional[str] = None
+    google_calendar_connected: Optional[bool] = None
+    settings: Optional[dict] = None

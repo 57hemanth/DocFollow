@@ -3,10 +3,23 @@ Agent Registry for DocFollow - Central management of all AI agents
 """
 
 from typing import Dict, Any, Optional
+from portia import Portia, Config, DefaultToolRegistry
+from backend.config import PORTIA_LLM_PROVIDER, GOOGLE_API_KEY, OPENAI_API_KEY
 from .follow_up_agent import FollowUpAgent
 from .message_analysis_agent import MessageAnalysisAgent
+from .appointment_agent import AppointmentAgent
+from .whatsapp_tools import send_whatsapp_message
 from backend.database import db
 import logging
+import asyncio
+from pydantic import BaseModel, Field
+
+# Define the schema for the custom tool, as required by the Portia Tool spec
+class SendWhatsAppMessageSchema(BaseModel):
+    """Input schema for the send_whatsapp_message tool."""
+    patient_phone: str = Field(..., description="The patient's phone number in E.164 format (e.g., +1234567890)")
+    message: str = Field(..., description="The message content to send to the patient")
+    followup_id: Optional[str] = Field(None, description="The ID of the followup to associate the message with")
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +34,7 @@ class AgentRegistry:
         self._agents = {}
         self._initialized = False
         
-    def initialize(self) -> bool:
+    async def initialize(self) -> bool:
         """
         Initialize all agents in the registry
         
@@ -35,6 +48,15 @@ class AgentRegistry:
         try:
             logger.info("Initializing AI agents...")
             
+            # Configure Portia based on available API keys
+            if PORTIA_LLM_PROVIDER == "google" and GOOGLE_API_KEY:
+                config = Config.from_default(llm_provider="google")
+            elif OPENAI_API_KEY:
+                config = Config.from_default(llm_provider="openai")
+            else:
+                logger.warning("No valid LLM provider configured. Agents may not work properly.")
+                config = Config.from_default(llm_provider="google")  # Fallback
+
             # Initialize Follow-up Agent
             try:
                 self._agents['follow_up'] = FollowUpAgent()
@@ -49,6 +71,35 @@ class AgentRegistry:
                 logger.info("✅ Message Analysis Agent initialized")
             except Exception as e:
                 logger.error(f"❌ Failed to initialize Message Analysis Agent: {str(e)}")
+                return False
+            
+            # Initialize Appointment Agent
+            try:
+                logger.info("Initializing Appointment Agent...")
+                logger.info("Creating tool registry for Portia Cloud tools...")
+                # Use DefaultToolRegistry which includes cloud tools if an API key is available
+                tools = DefaultToolRegistry(config)
+                
+                # Manually set all required attributes for the custom tool to make it valid
+                send_whatsapp_message.id = "send_whatsapp_message"
+                send_whatsapp_message.name = "send_whatsapp_message"
+                send_whatsapp_message.description = "Sends a WhatsApp message to a patient's phone number."
+                send_whatsapp_message.args_schema = SendWhatsAppMessageSchema
+                send_whatsapp_message.output_schema = str
+                
+                tools += [send_whatsapp_message]
+                logger.info("✅ Tool registry created successfully.")
+                
+                logger.info("Initializing Portia instance...")
+                # Run the synchronous Portia constructor in a separate thread
+                portia_instance = await asyncio.to_thread(Portia, config=config, tools=tools)
+                logger.info("✅ Portia instance initialized successfully.")
+                
+                # Create the AppointmentAgent with the Portia instance
+                self._agents['appointment'] = AppointmentAgent(portia_instance)
+                logger.info("✅ Appointment Agent initialized")
+            except Exception as e:
+                logger.error(f"❌ Failed to initialize Appointment Agent: {str(e)}", exc_info=True)
                 return False
             
             self._initialized = True
@@ -85,6 +136,19 @@ class AgentRegistry:
         
         return self._agents.get('message_analysis')
     
+    def get_appointment_agent(self) -> Optional[AppointmentAgent]:
+        """
+        Get the Appointment Agent instance
+        
+        Returns:
+            AppointmentAgent or None if not initialized
+        """
+        if not self._initialized:
+            logger.warning("Agent registry not initialized. Call initialize() first.")
+            return None
+        
+        return self._agents.get('appointment')
+    
     def is_initialized(self) -> bool:
         """Check if the registry is initialized"""
         return self._initialized
@@ -100,7 +164,8 @@ class AgentRegistry:
             "initialized": self._initialized,
             "agents": {
                 "follow_up": "available" if self._agents.get('follow_up') else "not_available",
-                "message_analysis": "available" if self._agents.get('message_analysis') else "not_available"
+                "message_analysis": "available" if self._agents.get('message_analysis') else "not_available",
+                "appointment": "available" if self._agents.get('appointment') else "not_available"
             },
             "total_agents": len(self._agents)
         }

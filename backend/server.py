@@ -52,7 +52,7 @@ async def startup_event():
             logger.warning("⚠️ Scheduler service failed to initialize")
         
         # Initialize AI agents
-        agent_success = agent_registry.initialize()
+        agent_success = await agent_registry.initialize()
         if agent_success:
             logger.info("✅ AI agents initialized successfully")
         else:

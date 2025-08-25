@@ -44,6 +44,7 @@ interface FollowUp {
   note?: string;
   created_at: string;
   updated_at: string;
+  gcal_auth_url?: string;
   // Fields to be populated client-side
   patient_name?: string;
   patient_phone?: string;
@@ -117,6 +118,24 @@ export default function Page() {
       fetchFollowUps(); // Refresh the list
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send message');
+    }
+  };
+
+  const handleBookAppointment = async (followupId: string, patientId: string, doctorId: string) => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/agents/appointment/book`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ followup_id: followupId, patient_id: patientId, doctor_id: doctorId }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to start appointment booking');
+      }
+      setIsDetailsDialogOpen(false);
+      fetchFollowUps(); // Refresh the list
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start appointment booking');
     }
   };
 
@@ -207,6 +226,7 @@ export default function Page() {
           isOpen={isDetailsDialogOpen}
           onClose={() => setIsDetailsDialogOpen(false)}
           onSendMessage={handleSendMessage}
+          onBookAppointment={handleBookAppointment}
         />
       )}
     </main>
@@ -234,9 +254,10 @@ interface DialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSendMessage: (followupId: string, message: string) => void;
+  onBookAppointment: (followupId: string, patientId: string, doctorId: string) => void;
 }
 
-const FollowUpDetailsDialog = ({ followup, isOpen, onClose, onSendMessage }: DialogProps) => {
+const FollowUpDetailsDialog = ({ followup, isOpen, onClose, onSendMessage, onBookAppointment }: DialogProps) => {
   const [message, setMessage] = useState('');
   
   useEffect(() => {
@@ -249,6 +270,10 @@ const FollowUpDetailsDialog = ({ followup, isOpen, onClose, onSendMessage }: Dia
     if (message.trim()) {
       onSendMessage(followup._id, message);
     }
+  };
+
+  const handleBookAppointmentClick = () => {
+    onBookAppointment(followup._id, followup.patient_id, followup.doctor_id);
   };
 
   if (!followup) return null;
@@ -301,6 +326,18 @@ const FollowUpDetailsDialog = ({ followup, isOpen, onClose, onSendMessage }: Dia
                 </div>
               </div>
             )}
+            
+            {followup.gcal_auth_url && (
+              <div className="space-y-2 pt-4 border-t">
+                <h4 className="font-semibold">Actions Required</h4>
+                <a href={followup.gcal_auth_url} target="_blank" rel="noopener noreferrer">
+                  <Button variant="destructive">Authorize Google Calendar</Button>
+                </a>
+                <p className="text-sm text-gray-500">
+                  Please authorize access to your Google Calendar to complete the appointment booking.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Right side: Communication */}
@@ -341,7 +378,10 @@ const FollowUpDetailsDialog = ({ followup, isOpen, onClose, onSendMessage }: Dia
         <DialogFooter className="mt-auto pt-4 border-t">
           <Button variant="outline" onClick={onClose}>Close</Button>
           {followup.status === 'waiting_for_doctor' && (
-            <Button onClick={handleSend}><Send className="mr-2 h-4 w-4" /> Send Message</Button>
+            <>
+              <Button onClick={handleSend}><Send className="mr-2 h-4 w-4" /> Send Message</Button>
+              <Button onClick={handleBookAppointmentClick} variant="secondary">Ask To Book Appointment</Button>
+            </>
           )}
         </DialogFooter>
       </DialogContent>

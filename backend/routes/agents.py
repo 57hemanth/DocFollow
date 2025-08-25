@@ -38,6 +38,11 @@ class BatchFollowUpRequest(BaseModel):
     doctor_id: str
     days_ahead: int = 1
 
+class BookAppointmentRequest(BaseModel):
+    followup_id: str
+    patient_id: str
+    doctor_id: str
+
 @router.get("/status")
 async def get_agent_status():
     """Get the status of all AI agents"""
@@ -55,7 +60,7 @@ async def get_agent_status():
 async def initialize_agents():
     """Initialize all AI agents"""
     try:
-        success = agent_registry.initialize()
+        success = await agent_registry.initialize()
         if success:
             return {
                 "success": True,
@@ -188,4 +193,26 @@ async def get_whatsapp_sandbox_info():
         raise
     except Exception as e:
         logger.error(f"Error getting sandbox info: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/appointment/book")
+async def book_appointment(request: BookAppointmentRequest):
+    """Start the appointment booking process for a patient"""
+    try:
+        appointment_agent = agent_registry.get_appointment_agent()
+        if not appointment_agent:
+            raise HTTPException(status_code=503, detail="Appointment agent not available")
+        
+        await appointment_agent.start_appointment_booking(
+            request.followup_id,
+            request.patient_id,
+            request.doctor_id
+        )
+        
+        return {"success": True, "message": "Appointment booking process started."}
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error starting appointment booking: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
