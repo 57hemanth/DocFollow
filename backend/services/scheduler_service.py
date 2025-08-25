@@ -5,6 +5,7 @@ Background Scheduler Service for DocFollow - Handles automated follow-up schedul
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.mongodb import MongoDBJobStore
 from apscheduler.executors.pool import ThreadPoolExecutor, ProcessPoolExecutor
+from apscheduler.executors.asyncio import AsyncIOExecutor
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
@@ -14,19 +15,6 @@ from backend.config import MONGODB_URI, MONGODB_DB_NAME
 from backend.database import db
 
 logger = logging.getLogger(__name__)
-
-
-def run_async(coro, *args):
-    """Helper to run coroutine in a new event loop"""
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    
-    if asyncio.iscoroutinefunction(coro):
-        return loop.run_until_complete(coro(*args))
-    return loop.run_until_complete(coro)
 
 
 def _cleanup_old_jobs():
@@ -143,8 +131,7 @@ class SchedulerService:
             
             # Configure executors  
             executors = {
-                'default': ThreadPoolExecutor(20),
-                'processpool': ProcessPoolExecutor(5)
+                'default': AsyncIOExecutor(),
             }
             
             # Job defaults
@@ -217,10 +204,10 @@ class SchedulerService:
             
             # Schedule the job
             job = self.scheduler.add_job(
-                func=run_async,
+                func=_send_follow_up_reminder,
                 trigger='date',
                 run_date=reminder_time,
-                args=[_send_follow_up_reminder, remainder_id, patient_id, doctor_id, followup_datetime.isoformat()],
+                args=[remainder_id, patient_id, doctor_id, followup_datetime.isoformat()],
                 id=job_id,
                 replace_existing=True,
                 misfire_grace_time=300  # 5 minutes grace time
