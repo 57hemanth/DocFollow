@@ -12,6 +12,7 @@ import logging
 import asyncio
 from backend.config import MONGODB_URI, MONGODB_DB_NAME
 from backend.database import db
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -124,15 +125,13 @@ class SchedulerService:
             
             # Configure job stores
             jobstores = {
-                'default': MongoDBJobStore(host=MONGODB_URI.split('/')[-1] if '//' in MONGODB_URI else MONGODB_URI, 
-                                         port=27017 if 'localhost' in MONGODB_URI else None,
-                                         database=MONGODB_DB_NAME,
-                                         collection='scheduled_jobs')
+                'default': MongoDBJobStore(database=MONGODB_DB_NAME, collection='scheduled_jobs', host=MONGODB_URI)
             }
             
             # Configure executors  
             executors = {
-                'default': AsyncIOExecutor()
+                'default': ThreadPoolExecutor(20),
+                'processpool': ProcessPoolExecutor(5)
             }
             
             # Job defaults
