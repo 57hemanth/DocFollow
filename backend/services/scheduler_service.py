@@ -15,6 +15,20 @@ from backend.database import db
 
 logger = logging.getLogger(__name__)
 
+
+def run_async(coro, *args):
+    """Helper to run coroutine in a new event loop"""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    if asyncio.iscoroutinefunction(coro):
+        return loop.run_until_complete(coro(*args))
+    return loop.run_until_complete(coro)
+
+
 def _cleanup_old_jobs():
     """Clean up old completed/failed followup records"""
     try:
@@ -203,10 +217,10 @@ class SchedulerService:
             
             # Schedule the job
             job = self.scheduler.add_job(
-                func=_send_follow_up_reminder,
+                func=run_async,
                 trigger='date',
                 run_date=reminder_time,
-                args=[remainder_id, patient_id, doctor_id, followup_datetime.isoformat()],
+                args=[_send_follow_up_reminder, remainder_id, patient_id, doctor_id, followup_datetime.isoformat()],
                 id=job_id,
                 replace_existing=True,
                 misfire_grace_time=300  # 5 minutes grace time
