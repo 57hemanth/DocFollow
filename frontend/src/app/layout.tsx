@@ -12,6 +12,9 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "DocFollow",
   description: "AI that follows up, so you can focus on healing",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
