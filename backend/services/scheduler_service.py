@@ -4,7 +4,7 @@ Background Scheduler Service for DocFollow - Handles automated follow-up schedul
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.mongodb import MongoDBJobStore
-from apscheduler.executors.asyncio import AsyncIOExecutor
+from apscheduler.executors.pool import ThreadPoolExecutor, ProcessPoolExecutor
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
@@ -12,7 +12,6 @@ import logging
 import asyncio
 from backend.config import MONGODB_URI, MONGODB_DB_NAME
 from backend.database import db
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 logger = logging.getLogger(__name__)
 
